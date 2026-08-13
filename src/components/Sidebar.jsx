@@ -1,7 +1,13 @@
 import { css } from '../lib/css'
 import { GREEN, NAV } from '../lib/design'
 
-export default function Sidebar({ current, onNavigate }) {
+function initialsOf(name) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || name[0].toUpperCase()
+}
+
+export default function Sidebar({ current, onNavigate, user, onSignOut, badges = {} }) {
   return (
     <aside
       className="fc-sidebar"
@@ -23,8 +29,9 @@ export default function Sidebar({ current, onNavigate }) {
       </div>
 
       <nav style={css('display: flex; flex-direction: column; gap: 4px;')}>
-        {NAV.map(([key, label, icon, badge]) => {
+        {NAV.map(([key, label, icon]) => {
           const active = current === key
+          const badge = badges[key]
           return (
             <button
               key={key}
@@ -68,13 +75,24 @@ export default function Sidebar({ current, onNavigate }) {
           </div>
         </div>
         <div style={css('display: flex; align-items: center; gap: 10px; padding: 4px 6px;')}>
-          <div style={css('width: 34px; height: 34px; border-radius: 50%; background: #E6F6DE; color: #2E7A12; display: grid; place-items: center; font-weight: 800; font-size: 13px;')}>
-            SA
+          <div style={css('width: 34px; height: 34px; border-radius: 50%; background: #E6F6DE; color: #2E7A12; display: grid; place-items: center; font-weight: 800; font-size: 13px; flex: none;')}>
+            {initialsOf(user?.name)}
           </div>
-          <div style={css('line-height: 1.25;')}>
-            <div style={css('font-size: 13px; font-weight: 700;')}>Sami Al Harbi</div>
-            <div style={css('font-size: 11.5px; color: #7B857F; font-weight: 600;')}>Owner</div>
+          <div style={css('line-height: 1.25; flex: 1; min-width: 0;')}>
+            <div style={css('font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;')}>{user?.name || '—'}</div>
+            <div style={css('font-size: 11.5px; color: #7B857F; font-weight: 600; text-transform: capitalize;')}>
+              {user?.permissions || user?.role || ''}
+            </div>
           </div>
+          <button
+            onClick={onSignOut}
+            title="Sign out"
+            style={css('flex: none; background: transparent; border: none; color: #7B857F; cursor: pointer; padding: 6px; border-radius: 8px;')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
+          </button>
         </div>
       </div>
     </aside>

@@ -1,14 +1,22 @@
+import { useState } from 'react'
 import { css } from '../lib/css'
-import { FLOWS, GREEN, chip } from '../lib/design'
-import { DRAWER_LINES } from '../lib/data'
+import { FLOWS, GREEN, chip, money } from '../lib/design'
 import { decorate } from '../lib/orders'
+import { fromFils, localized } from '../lib/adapt'
 
-export default function OrderDrawer({ order, onClose, onAdvance }) {
+export default function OrderDrawer({ order, onClose, onAdvance, onCancel }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
   if (!order) return null
 
+  const cancelled = order.status === 'Cancelled'
   const flow = FLOWS[order.type]
   const at = flow.indexOf(order.status)
   const sel = decorate(order)
+  const lines = order.raw?.lines || []
+  const deliveryFeeAed = fromFils(order.raw?.deliveryFee ?? 0)
+  const payLabel = { card: 'card', cash: 'cash', credit: 'shop credit' }[order.raw?.paymentKind] || 'card'
 
   const steps = flow.map((label, k) => ({
     label,
@@ -23,6 +31,33 @@ export default function OrderDrawer({ order, onClose, onAdvance }) {
     labelStyle: `font-size:15px;font-weight:${k === at ? 800 : 600};color:${k <= at ? '#14181A' : '#9AA39C'};`,
   }))
 
+  const advance = async () => {
+    setErr('')
+    setBusy(true)
+    try {
+      await onAdvance(sel.id)
+    } catch (e) {
+      setErr(e.message || 'Could not update this order.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const cancel = async () => {
+    const reason = window.prompt('Reason for cancelling this order?')
+    if (reason == null) return
+    setErr('')
+    setBusy(true)
+    try {
+      await onCancel(sel.id, reason)
+      onClose()
+    } catch (e) {
+      setErr(e.message || 'Could not cancel this order.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div style={css('position: fixed; inset: 0; background: rgba(15,26,18,.42); display: flex; justify-content: flex-end; z-index: 20;')}>
       <div onClick={onClose} style={css('flex: 1;')} />
@@ -36,6 +71,9 @@ export default function OrderDrawer({ order, onClose, onAdvance }) {
               Order #{sel.id} · {sel.time}
             </div>
             <div style={css('font-size: 26px; font-weight: 800; letter-spacing: -.7px; margin-top: 4px;')}>{sel.customer}</div>
+            {order.customerPhone ? (
+              <div style={css('font-size: 13px; color: #7B857F; font-weight: 600; margin-top: 2px;')}>{order.customerPhone}</div>
+            ) : null}
             <div style={css('display: flex; align-items: center; gap: 8px; margin-top: 10px;')}>
               <span style={css(sel.typeStyle)}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -58,59 +96,83 @@ export default function OrderDrawer({ order, onClose, onAdvance }) {
           {sel.detail}
         </div>
 
-        <div>
-          <div style={css('font-size: 13px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .6px;')}>
-            {sel.type === 'Delivery' ? 'Home delivery flow' : 'Curbside pickup flow'}
+        {cancelled ? (
+          <div style={css('background: #FFF1EF; border: 1px solid #F3B4AC; border-radius: 16px; padding: 16px 18px; font-size: 14px; font-weight: 700; color: #B3261E;')}>
+            This order was cancelled{order.raw?.cancelReason ? `: ${order.raw.cancelReason}` : '.'}
           </div>
-          <div style={css('display: flex; flex-direction: column; gap: 0; margin-top: 12px;')}>
-            {steps.map((st) => (
-              <div key={st.label} style={css('display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: center; padding: 9px 0;')}>
-                <div style={css(st.dotStyle)}>{st.mark}</div>
-                <div style={css(st.labelStyle)}>{st.label}</div>
-              </div>
-            ))}
+        ) : (
+          <div>
+            <div style={css('font-size: 13px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .6px;')}>
+              {sel.type === 'Delivery' ? 'Home delivery flow' : 'Curbside pickup flow'}
+            </div>
+            <div style={css('display: flex; flex-direction: column; gap: 0; margin-top: 12px;')}>
+              {steps.map((st) => (
+                <div key={st.label} style={css('display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: center; padding: 9px 0;')}>
+                  <div style={css(st.dotStyle)}>{st.mark}</div>
+                  <div style={css(st.labelStyle)}>{st.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div>
           <div style={css('font-size: 13px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .6px;')}>
             {sel.items} items
           </div>
           <div style={css('display: flex; flex-direction: column; gap: 0; margin-top: 8px;')}>
-            {DRAWER_LINES.map((l) => (
-              <div key={l.name} style={css('display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #F2F4F0;')}>
-                <span style={css('font-size: 13.5px; font-weight: 800; color: #7B857F; width: 28px;')}>{l.qty}</span>
-                <span style={css('flex: 1; font-size: 14.5px; font-weight: 700;')}>{l.name}</span>
-                <span style={css('font-size: 14.5px; font-weight: 800;')}>{l.price}</span>
+            {lines.map((l) => (
+              <div key={l.variantId} style={css('display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #F2F4F0;')}>
+                <span style={css('font-size: 13.5px; font-weight: 800; color: #7B857F; width: 28px;')}>{l.fulfilledQty ?? l.quantity}×</span>
+                <span style={css('flex: 1; font-size: 14.5px; font-weight: 700;')}>
+                  {localized(l.name)}
+                  {localized(l.variantLabel) ? ` · ${localized(l.variantLabel)}` : ''}
+                </span>
+                <span style={css('font-size: 14.5px; font-weight: 800;')}>{money(fromFils(l.unitPrice) * (l.fulfilledQty ?? l.quantity))}</span>
               </div>
             ))}
           </div>
           <div style={css('display: flex; align-items: center; margin-top: 14px; font-size: 20px; font-weight: 800;')}>
             <span style={css('flex: 1;')}>Total</span>
-            <span>{sel.total}</span>
+            <span>{money(sel.total)}</span>
           </div>
           <div style={css('font-size: 13px; color: #7B857F; font-weight: 600; margin-top: 3px;')}>
             {sel.type === 'Delivery'
-              ? 'Includes AED 8.00 delivery fee · paid by card'
-              : 'No delivery fee for curbside · paid by card'}
+              ? `Includes ${money(deliveryFeeAed)} delivery fee · paid by ${payLabel}`
+              : `No delivery fee for curbside · paid by ${payLabel}`}
           </div>
         </div>
 
-        <div className="fc-drawer-cta" style={css('margin-top: auto; display: flex; gap: 10px;')}>
-          <button
-            onClick={() => onAdvance(sel.id)}
-            style={css(
-              `flex:1;background:${
-                sel.status === 'Customer Arrived' ? '#B3261E' : GREEN
-              };color:#FFFFFF;border:none;border-radius:14px;padding:16px 20px;font-size:16px;font-weight:800;cursor:pointer;`,
+        {err ? (
+          <div style={css('background: #FFF1EF; border: 1px solid #F3B4AC; color: #B3261E; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; font-weight: 700;')}>
+            {err}
+          </div>
+        ) : null}
+
+        {!cancelled ? (
+          <div className="fc-drawer-cta" style={css('margin-top: auto; display: flex; gap: 10px;')}>
+            <button
+              onClick={advance}
+              disabled={busy || !sel.canAdvance}
+              style={css(
+                `flex:1;background:${
+                  sel.status === 'Customer Arrived' ? '#B3261E' : GREEN
+                };color:#FFFFFF;border:none;border-radius:14px;padding:16px 20px;font-size:16px;font-weight:800;cursor:${busy ? 'default' : 'pointer'};opacity:${busy ? 0.7 : 1};`,
+              )}
+            >
+              {busy ? 'Working…' : sel.next}
+            </button>
+            {(order.status === 'Placed' || order.status === 'Packed') && (
+              <button
+                onClick={cancel}
+                disabled={busy}
+                style={css('background: #FFFFFF; color: #B3261E; border: 1px solid #F3B4AC; border-radius: 14px; padding: 16px 20px; font-size: 15px; font-weight: 800; cursor: pointer;')}
+              >
+                Cancel order
+              </button>
             )}
-          >
-            {sel.next}
-          </button>
-          <button style={css('background: #FFFFFF; color: #B3261E; border: 1px solid #F3B4AC; border-radius: 14px; padding: 16px 20px; font-size: 15px; font-weight: 800; cursor: pointer;')}>
-            Cancel order
-          </button>
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )
