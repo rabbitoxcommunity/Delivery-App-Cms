@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { css } from '../lib/css'
 import { fromFils, toFils } from '../lib/adapt'
 import { api } from '../lib/api'
@@ -12,15 +13,20 @@ const STATE_TO_STOCK = { Available: 'available', 'Low Stock': 'low', 'Out of Sto
 let variantKeySeed = 0
 const nextKey = () => `v${variantKeySeed++}`
 
-export default function AddProduct({ productId, newState, onNewState, onBack }) {
+export default function AddProduct() {
+  const navigate = useNavigate()
+  const { id: productId } = useParams()
+  const onBack = () => navigate('/products')
+  const [newState, onNewState] = useState('Available')
   const isEditing = Boolean(productId)
   const barcodeRef = useRef(null)
 
   const { data: categories } = useFetch(() => api.get('/admin/categories'), [])
-  const { data: existing, loading: loadingExisting } = useFetch(
-    () => (productId ? api.get(`/admin/products/${productId}`) : Promise.resolve(null)),
-    [productId],
-  )
+  const {
+    data: existing,
+    loading: loadingExisting,
+    error: existingError,
+  } = useFetch(() => (productId ? api.get(`/admin/products/${productId}`) : Promise.resolve(null)), [productId])
 
   const [nameEn, setNameEn] = useState('')
   const [nameAr, setNameAr] = useState('')
@@ -140,6 +146,26 @@ export default function AddProduct({ productId, newState, onNewState, onBack }) 
 
   if (productId && loadingExisting) {
     return <div style={css('padding: 40px; text-align: center; color: #7B857F; font-weight: 700;')}>Loading product…</div>
+  }
+
+  // A stale bookmark, browser back/forward, or a hand-edited URL can point at
+  // a product that's been deleted since — surface that plainly instead of
+  // silently rendering a blank "new product" form under an Edit heading.
+  if (productId && existingError) {
+    return (
+      <div style={css('display: flex; flex-direction: column; gap: 16px; max-width: 640px;')}>
+        <button className="hv-link" onClick={onBack} style={css('display: flex; align-items: center; gap: 8px; align-self: flex-start; background: transparent; border: none; padding: 0; font-size: 14px; font-weight: 800; color: #7B857F; cursor: pointer;')}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 6l-6 6 6 6" /></svg>
+          Back to products
+        </button>
+        <div style={css('background: #FFF1EF; border: 1px solid #F3B4AC; border-radius: 16px; padding: 24px; text-align: center;')}>
+          <div style={css('font-size: 15px; font-weight: 800; color: #B3261E;')}>Couldn't find this product</div>
+          <div style={css('font-size: 13.5px; color: #96423B; font-weight: 600; margin-top: 6px;')}>
+            {existingError.message || 'It may have been deleted.'}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { css } from '../lib/css'
 import { GREEN } from '../lib/design'
 import { localized } from '../lib/adapt'
@@ -15,7 +16,9 @@ const CATEGORY_ICONS = ['cat-fruits', 'cat-dairy', 'cat-bakery', 'cat-beverages'
 const slugify = (s) =>
   s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `cat-${Date.now()}`
 
-export default function AddCategory({ onBack }) {
+export default function AddCategory() {
+  const navigate = useNavigate()
+  const onBack = () => navigate('/categories')
   const { data: categories } = useFetch(() => api.get('/admin/categories'), [])
 
   const [nameEn, setNameEn] = useState('')

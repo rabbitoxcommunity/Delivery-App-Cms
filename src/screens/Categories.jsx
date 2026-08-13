@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { css } from '../lib/css'
 import { localized } from '../lib/adapt'
 import { api } from '../lib/api'
@@ -7,7 +8,9 @@ import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
 
-export default function Categories({ onGoAddCat }) {
+export default function Categories() {
+  const navigate = useNavigate()
+  const onGoAddCat = () => navigate('/categories/new')
   const [q, setQ] = useState('')
 
   const fetchAll = useCallback(async () => {

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { css } from '../lib/css'
 import { PROPS, stockPill } from '../lib/design'
 import { fromFils, localized, toFils } from '../lib/adapt'
@@ -14,10 +15,16 @@ const VAR_THUMB = 'width:38px;height:38px;border-radius:9px;margin-left:16px;dis
 const ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1fr 130px 150px 96px;gap:14px;align-items:center;padding:13px 20px;min-width:1000px;border-top:1px solid #F2F4F0;'
 const VAR_ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1fr 130px 150px 96px;gap:14px;align-items:center;padding:11px 20px 11px 32px;min-width:1000px;border-top:1px solid #F6F8F4;background:#FCFDFB;'
 
-export default function Products({ open, onToggle, onGoAdd, onEdit }) {
+export default function Products() {
+  const navigate = useNavigate()
+  const [open, setOpen] = useState({})
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
   const limit = 20
+
+  const onToggle = (id) => setOpen((prev) => ({ ...prev, [id]: !prev[id] }))
+  const onGoAdd = () => navigate('/products/new')
+  const onEdit = (id) => navigate(`/products/${id}/edit`)
 
   const fetchProducts = useCallback(async () => {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })

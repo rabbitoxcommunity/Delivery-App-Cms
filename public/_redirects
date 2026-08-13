@@ -1,0 +1,5 @@
+# SPA fallback for react-router-dom's BrowserRouter — every client-side route
+# (e.g. /products, /staff) must resolve to index.html and let the router take
+# over, or a direct load/refresh on any route but "/" 404s at the host level.
+# Honoured by Netlify, Cloudflare Pages, and Render out of the box.
+/*  /index.html  200

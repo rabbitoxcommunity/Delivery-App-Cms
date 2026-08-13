@@ -6,6 +6,11 @@ import { AuthProvider } from './lib/auth.jsx'
 import { registerServiceWorker } from './pwa.js'
 import './index.css'
 
+// App.jsx owns the router itself (createBrowserRouter + RouterProvider —
+// required for the `handle`/useMatches route-metadata API Header relies on),
+// so there's no separate <BrowserRouter> to wrap here. AuthProvider doesn't
+// use router hooks, so its position relative to the router doesn't matter;
+// it wraps App so every routed screen can reach useAuth().
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>

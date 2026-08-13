@@ -59,7 +59,7 @@ full-width, and action cells carry `.fc-act` so their button spans the card.
 
 - [`public/manifest.webmanifest`](public/manifest.webmanifest) — standalone display,
   brand theme colour, any/maskable icons, plus Live Orders and Quick Stock shortcuts
-  (deep-linked through `?screen=`).
+  (deep-linked to `/live` and `/stock`).
 - [`public/sw.js`](public/sw.js) — network-first for navigations with a cached app
   shell fallback, stale-while-revalidate for same-origin assets. Registered from
   [`src/pwa.js`](src/pwa.js) in production only; a new deployment activates on the
@@ -78,6 +78,31 @@ rsvg-convert -w 512 -h 512 icons/icon.svg -o icons/icon-512.png
 rsvg-convert -w 512 -h 512 icons/icon-maskable.svg -o icons/icon-512-maskable.png
 rsvg-convert -w 180 -h 180 icons/icon.svg -o icons/apple-touch-icon.png
 ```
+
+## Deployment — SPA fallback is required
+
+Routing is client-side (`react-router-dom`'s `BrowserRouter`), so every route
+(`/products`, `/staff`, `/products/:id/edit`, …) only exists in the browser —
+the host must serve `index.html` for any path it doesn't recognise and let the
+router take it from there. Without that, a direct load, refresh, or shared
+deep link on anything but `/` 404s at the host.
+
+Already wired up here:
+- **Netlify / Cloudflare Pages / Render** — [`public/_redirects`](public/_redirects)
+- **Vercel** — [`vercel.json`](vercel.json)
+
+Other hosts need the equivalent rewrite rule, e.g. nginx:
+
+```nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```
+
+`public/sw.js` also falls back to the last cached shell if a navigation ever
+gets a non-2xx response, so a misconfigured host degrades to a stale-but-working
+shell for repeat visitors rather than a broken page — but it can't help a
+visitor's very first load, so the host-level rewrite above is the real fix.
 
 ## Notes
 

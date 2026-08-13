@@ -55,6 +55,14 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((res) => {
+          // Only a real 200 for the deep-linked path is the app shell. A host
+          // with no SPA catch-all rewrite (this is a client-routed app — every
+          // path from react-router-dom must serve index.html) returns a plain
+          // 404 for e.g. /products on direct load/refresh; caching THAT under
+          // SHELL_URL would poison the offline shell with a dead page. Fall
+          // back to the last-known-good cached shell instead, and only ever
+          // update the cache from a genuinely successful response.
+          if (!res.ok) throw new Error(`navigation fetch ${res.status}`)
           const copy = res.clone()
           caches.open(SHELL_CACHE).then((c) => c.put(SHELL_URL, copy))
           return res

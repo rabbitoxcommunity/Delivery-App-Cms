@@ -1,12 +1,19 @@
+import { useMatches } from 'react-router-dom'
 import { css } from '../lib/css'
-import { PROPS, TITLES } from '../lib/design'
+import { PROPS } from '../lib/design'
 
 const SOUND_ON = 'M11 5 6 9H3v6h3l5 4V5ZM16 9a4 4 0 0 1 0 6'
 const SOUND_OFF = 'M11 5 6 9H3v6h3l5 4V5ZM16 10l4 4M20 10l-4 4'
 
-export default function Header({ screen, onOpenNav }) {
+export default function Header({ onOpenNav }) {
   const sound = PROPS.soundAlerts
-  const [title, sub] = TITLES[screen]
+  // Title/subtitle live on the matching <Route>'s `handle` (set in App.jsx) —
+  // one source of truth instead of a second path-keyed array to keep in sync.
+  // useMatches() returns outer-to-inner; the deepest one with a handle wins.
+  const matches = useMatches()
+  const current = [...matches].reverse().find((m) => m.handle?.title)
+  const title = current?.handle?.title ?? 'FreshCart'
+  const sub = current?.handle?.subtitle ?? ''
 
   return (
     <header

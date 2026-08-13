@@ -1,3 +1,4 @@
+import { NavLink } from 'react-router-dom'
 import { css } from '../lib/css'
 import { GREEN, NAV } from '../lib/design'
 
@@ -7,7 +8,7 @@ function initialsOf(name) {
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || name[0].toUpperCase()
 }
 
-export default function Sidebar({ current, onNavigate, user, onSignOut, badges = {} }) {
+export default function Sidebar({ onNavigate, user, onSignOut, badges = {} }) {
   return (
     <aside
       className="fc-sidebar"
@@ -29,37 +30,43 @@ export default function Sidebar({ current, onNavigate, user, onSignOut, badges =
       </div>
 
       <nav style={css('display: flex; flex-direction: column; gap: 4px;')}>
-        {NAV.map(([key, label, icon]) => {
-          const active = current === key
-          const badge = badges[key]
+        {NAV.map(([path, label, icon]) => {
+          const badge = badges[path]
           return (
-            <button
-              key={key}
-              onClick={() => onNavigate(key)}
-              style={css(
-                `display:flex;align-items:center;gap:12px;padding:12px 14px;border:none;border-radius:12px;font-size:14.5px;font-weight:${
-                  active ? 800 : 700
-                };cursor:pointer;text-align:left;${
-                  active ? `background:${GREEN};color:#FFFFFF;` : 'background:transparent;color:#4C5850;'
-                }`,
-              )}
+            <NavLink
+              key={path}
+              to={path}
+              onClick={onNavigate}
+              style={({ isActive }) =>
+                css(
+                  `display:flex;align-items:center;gap:12px;padding:12px 14px;border:none;border-radius:12px;font-size:14.5px;font-weight:${
+                    isActive ? 800 : 700
+                  };cursor:pointer;text-align:left;text-decoration:none;${
+                    isActive ? `background:${GREEN};color:#FFFFFF;` : 'background:transparent;color:#4C5850;'
+                  }`,
+                )
+              }
             >
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d={icon} />
-              </svg>
-              <span style={css('flex: 1; text-align: left;')}>{label}</span>
-              {badge ? (
-                <span
-                  style={css(
-                    `background:${active ? 'rgba(255,255,255,.25)' : '#FFE8E5'};color:${
-                      active ? '#FFFFFF' : '#B3261E'
-                    };font-size:11.5px;font-weight:800;padding:3px 8px;border-radius:7px;`,
-                  )}
-                >
-                  {badge}
-                </span>
-              ) : null}
-            </button>
+              {({ isActive }) => (
+                <>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d={icon} />
+                  </svg>
+                  <span style={css('flex: 1; text-align: left;')}>{label}</span>
+                  {badge ? (
+                    <span
+                      style={css(
+                        `background:${isActive ? 'rgba(255,255,255,.25)' : '#FFE8E5'};color:${
+                          isActive ? '#FFFFFF' : '#B3261E'
+                        };font-size:11.5px;font-weight:800;padding:3px 8px;border-radius:7px;`,
+                      )}
+                    >
+                      {badge}
+                    </span>
+                  ) : null}
+                </>
+              )}
+            </NavLink>
           )
         })}
       </nav>
