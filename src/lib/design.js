@@ -71,8 +71,8 @@ export const NAV = [
 ]
 
 // Editor-facing props in the source component, fixed here as app defaults.
+// Sound alerts used to live here too — they're now real state, in lib/sound.js.
 export const PROPS = {
   showArabicNames: true,
   showSeasonalAlert: true,
-  soundAlerts: true,
 }

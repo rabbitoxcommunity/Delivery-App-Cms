@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { css } from '../lib/css'
-import { PROPS, money, pillBtn } from '../lib/design'
+import { money, pillBtn } from '../lib/design'
 import { decorate } from '../lib/orders'
+import { useSoundAlerts } from '../lib/sound'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
 import StateBlock from '../components/StateBlock'
@@ -25,6 +26,7 @@ function minutesAgo(iso) {
 export default function LiveOrders({ orders, loading, error, onRetry, filter, onFilter, onOpenOrder, onAdvance }) {
   const [dismissed, setDismissed] = useState(new Set())
   const stats = useTodayStats()
+  const { enabled: soundOn } = useSoundAlerts()
 
   const rows = orders.filter((o) => filter === 'All' || o.type === filter).map(decorate)
 
@@ -92,7 +94,7 @@ export default function LiveOrders({ orders, loading, error, onRetry, filter, on
             </div>
             <div style={css('font-size: 13px; color: #A8B6AC; font-weight: 600; margin-top: 3px;')}>
               {newestPlaced.type === 'Curbside' ? 'Curbside pickup' : 'Home delivery'} · {newestPlaced.items} items ·{' '}
-              {money(newestPlaced.total)} {PROPS.soundAlerts ? '· chime played' : ''}
+              {money(newestPlaced.total)} {soundOn ? '· chime played' : ''}
             </div>
           </div>
           <button

@@ -9,12 +9,20 @@
  *                  and the font files are cached by the browser anyway).
  */
 
-const VERSION = 'v1'
+const VERSION = 'v2'
 const SHELL_CACHE = `freshcart-shell-${VERSION}`
 const ASSET_CACHE = `freshcart-assets-${VERSION}`
 const SHELL_URL = new URL('./index.html', self.registration.scope).pathname
 
-const SHELL_FILES = [SHELL_URL, new URL('./manifest.webmanifest', self.registration.scope).pathname]
+// The alert clips are precached rather than left to stale-while-revalidate:
+// a chime that only works once the asset has been fetched is a chime that
+// misses the first order after an install.
+const SHELL_FILES = [
+  SHELL_URL,
+  ...['manifest.webmanifest', 'sounds/order-sound.mp3', 'sounds/order-delivered.mp3'].map(
+    (file) => new URL(`./${file}`, self.registration.scope).pathname,
+  ),
+]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

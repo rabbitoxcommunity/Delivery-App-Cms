@@ -3,8 +3,16 @@ import { api, idempotencyKey } from './api'
 import { LABEL_TO_STATUS, mapOrderRow } from './adapt'
 import { FLOWS } from './design'
 import { connectQueueSocket, disconnectQueueSocket } from './socket'
+import { playAlert } from './sound'
 
 const TERMINAL = new Set(['delivered', 'handed_over', 'cancelled'])
+const COMPLETED = new Set(['delivered', 'handed_over'])
+
+// The event payload shape isn't pinned down server-side yet, so read the status
+// from the shapes it plausibly arrives in and stay silent if it's none of them.
+function statusOf(payload) {
+  return payload?.status ?? payload?.order?.status ?? payload?.data?.status ?? null
+}
 
 /**
  * Live queue: orders that still need action. Backed by GET /admin/orders
@@ -41,9 +49,21 @@ export function useLiveOrders({ tenantId, accessToken }) {
   useEffect(() => {
     if (!tenantId || !accessToken) return undefined
     const onEvent = () => load()
+
+    // Alerts hang off the socket rather than off `rows`, for two reasons: a
+    // completed order leaves the active queue entirely (see TERMINAL above), so
+    // there is no state change left to diff against; and the initial fetch then
+    // can't chime for orders that were already sitting there when the screen
+    // opened — only genuinely new events make a sound.
     connectQueueSocket(tenantId, accessToken, {
-      'order.created': onEvent,
-      'order.status': onEvent,
+      'order.created': () => {
+        playAlert('order')
+        load()
+      },
+      'order.status': (payload) => {
+        if (COMPLETED.has(statusOf(payload))) playAlert('delivered')
+        load()
+      },
       'order.assigned': onEvent,
       'order.lines': onEvent,
       'order.arrived': onEvent,

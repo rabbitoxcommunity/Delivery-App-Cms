@@ -1,12 +1,13 @@
 import { useMatches } from 'react-router-dom'
 import { css } from '../lib/css'
-import { PROPS } from '../lib/design'
+import { useSoundAlerts } from '../lib/sound'
 
 const SOUND_ON = 'M11 5 6 9H3v6h3l5 4V5ZM16 9a4 4 0 0 1 0 6'
 const SOUND_OFF = 'M11 5 6 9H3v6h3l5 4V5ZM16 10l4 4M20 10l-4 4'
 
 export default function Header({ onOpenNav }) {
-  const sound = PROPS.soundAlerts
+  const { enabled, blocked, toggle } = useSoundAlerts()
+  const sound = enabled && !blocked
   // Title/subtitle live on the matching <Route>'s `handle` (set in App.jsx) —
   // one source of truth instead of a second path-keyed array to keep in sync.
   // useMatches() returns outer-to-inner; the deepest one with a handle wins.
@@ -42,12 +43,27 @@ export default function Header({ onOpenNav }) {
         </div>
         <button
           className="hv-soft"
-          style={css('display: flex; align-items: center; gap: 9px; background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 999px; padding: 9px 15px; font-size: 13px; font-weight: 700; color: #37413A; cursor: pointer;')}
+          onClick={toggle}
+          aria-pressed={enabled}
+          title={
+            blocked
+              ? 'Your browser blocked playback — click to allow sound alerts'
+              : enabled
+                ? 'Turn sound alerts off'
+                : 'Turn sound alerts on'
+          }
+          style={css(
+            `display: flex; align-items: center; gap: 9px; background: #FFFFFF; border: 1px solid ${
+              blocked ? '#F2D18A' : '#E4EADF'
+            }; border-radius: 999px; padding: 9px 15px; font-size: 13px; font-weight: 700; color: ${
+              blocked ? '#7A5205' : '#37413A'
+            }; cursor: pointer;`,
+          )}
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <path d={sound ? SOUND_ON : SOUND_OFF} />
           </svg>
-          {sound ? 'Sound alerts on' : 'Sound alerts off'}
+          {blocked ? 'Sound alerts blocked' : enabled ? 'Sound alerts on' : 'Sound alerts off'}
         </button>
       </div>
     </header>
