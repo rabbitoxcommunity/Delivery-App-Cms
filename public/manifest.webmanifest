@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "FreshCart Admin",
+  "short_name": "FreshCart",
+  "description": "Back office for FreshCart — live orders, stock, products, credit and delivery staff.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#F6F7F5",
+  "theme_color": "#47BB1C",
+  "categories": ["business", "productivity", "shopping"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Live Orders", "short_name": "Live", "url": "./?screen=live" },
+    { "name": "Quick Stock", "short_name": "Stock", "url": "./?screen=stock" }
+  ]
+}

@@ -1,0 +1,209 @@
+/* ==========================================================================
+   FreshCart Admin — base styles
+   The block below is carried over verbatim from the source design's <helmet>.
+   Everything after it is additive: hover states (which inline styles cannot
+   express) and the responsive layer, which only engages below 1100px so the
+   desktop rendering stays byte-for-byte identical to the design.
+   ========================================================================== */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Manrope, Helvetica, Arial, sans-serif;
+  background: #F6F7F5;
+  color: #14181A;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: #2E7A12; text-decoration: none; }
+a:hover { color: #47BB1C; }
+
+input, button, select { font-family: inherit; }
+input:focus { outline: 2px solid #47BB1C; outline-offset: -1px; }
+
+@keyframes fcPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes fcGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(179, 38, 30, .28); }
+  50% { box-shadow: 0 0 0 8px rgba(179, 38, 30, 0); }
+}
+
+/* --------------------------------------------------------------------------
+   Hover states (`style-hover` in the source). !important is required because
+   the base declarations are inline styles.
+   -------------------------------------------------------------------------- */
+
+.hv-soft:hover     { background: #F3F6F1 !important; }
+.hv-row:hover      { background: #F6F9F4 !important; }
+.hv-green:hover    { background: #3EA518 !important; }
+.hv-green-lt:hover { background: #58D22B !important; }
+.hv-dark:hover     { background: #1E3520 !important; }
+.hv-red:hover      { background: #C93028 !important; }
+.hv-amber:hover    { background: #5E3F04 !important; }
+.hv-violet:hover   { background: #E7DAFA !important; }
+.hv-white:hover    { color: #FFFFFF !important; }
+.hv-link:hover     { color: #2E7A12 !important; }
+.hv-input:hover    { border-color: #E4EADF !important; background: #FAFBF9 !important; }
+
+/* --------------------------------------------------------------------------
+   Additive chrome: mobile nav trigger, scrim, install prompt. All hidden at
+   desktop widths.
+   -------------------------------------------------------------------------- */
+
+.fc-burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  background: #FFFFFF;
+  border: 1px solid #E4EADF;
+  border-radius: 12px;
+  color: #37413A;
+  cursor: pointer;
+}
+
+.fc-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 26, 18, .42);
+  z-index: 50;
+}
+
+/* Sits below the order drawer (z 20) and the nav drawer, so it never blocks
+   either, and carries its own dismiss. */
+.fc-install {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #0F1A12;
+  color: #FFFFFF;
+  border-radius: 999px;
+  padding: 5px 6px 5px 18px;
+  box-shadow: 0 12px 34px rgba(15, 26, 18, .28);
+}
+.fc-install > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  color: inherit;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 4px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.fc-install > button:last-child {
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+  color: #A8B6AC;
+}
+.fc-install > button:last-child:hover { background: #1E3520; color: #FFFFFF; }
+
+/* Horizontal table scrollers keep a slim, on-brand scrollbar. */
+.fc-tbl { scrollbar-width: thin; scrollbar-color: #D8E0D3 transparent; }
+.fc-tbl::-webkit-scrollbar { height: 8px; }
+.fc-tbl::-webkit-scrollbar-thumb { background: #D8E0D3; border-radius: 8px; }
+
+/* The order drawer is 520px by design; never wider than the viewport. */
+.fc-drawer { max-width: 100%; }
+
+/* ==========================================================================
+   Responsive layer
+   ========================================================================== */
+
+/* Sidebar becomes an off-canvas drawer once the 252px rail stops paying rent. */
+@media (max-width: 1100px) {
+  .fc-shell { grid-template-columns: 1fr !important; }
+
+  .fc-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0;
+    z-index: 60;
+    width: 252px;
+    height: 100dvh !important;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform .26s ease;
+    box-shadow: 18px 0 50px rgba(15, 26, 18, .16);
+  }
+
+  body.fc-nav-open .fc-sidebar { transform: none; }
+  body.fc-nav-open .fc-scrim { display: block; }
+  body.fc-nav-open { overflow: hidden; }
+
+  .fc-burger { display: inline-flex; }
+  .fc-header { padding: 14px 18px !important; }
+  .fc-content { padding: 20px 18px 36px !important; }
+}
+
+@media (max-width: 900px) {
+  .fc-header { flex-wrap: wrap; align-items: flex-start !important; gap: 12px !important; }
+  .fc-headtools { margin-left: 0 !important; width: 100%; flex-wrap: wrap; }
+  .fc-alert { flex-wrap: wrap !important; }
+  .fc-alert > button { flex: 1 1 auto; }
+  .fc-sticky { position: static !important; }
+  .fc-toolbar > * { flex: 1 1 220px; justify-content: center; }
+}
+
+/* Wide data grids stop being tables and become stacked cards. */
+@media (max-width: 760px) {
+  .fc-tbl { overflow-x: visible !important; }
+  .fc-thead { display: none !important; }
+
+  .fc-row {
+    display: block !important;
+    min-width: 0 !important;
+    padding: 14px 16px !important;
+  }
+  .fc-row > * { min-width: 0 !important; padding: 5px 0; }
+  .fc-row > *[data-label] {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .fc-row > *[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 800;
+    color: #7B857F;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .fc-row > .fc-act { display: flex !important; margin-top: 10px; }
+  .fc-row > .fc-act > button { width: 100%; }
+
+  .fc-tblfoot { min-width: 0 !important; flex-wrap: wrap; }
+  .fc-drag { display: none !important; }
+}
+
+@media (max-width: 640px) {
+  .fc-title { font-size: 19px !important; }
+  .fc-xl { font-size: 40px !important; letter-spacing: -1.4px !important; }
+  .fc-stockrow { gap: 12px !important; padding: 14px 16px !important; }
+  .fc-stockacts { width: 100%; margin-left: 0 !important; }
+  .fc-stockacts > button {
+    flex: 1 1 0;
+    min-width: 0 !important;
+    padding: 13px 6px !important;
+    font-size: 13.5px !important;
+  }
+  .fc-drawer { padding: 20px 18px 26px !important; }
+  .fc-drawer-cta { flex-wrap: wrap; }
+  .fc-drawer-cta > button { flex: 1 1 100%; }
+  .fc-staffstats { flex-wrap: wrap; gap: 16px 22px !important; }
+  .fc-install { left: 16px; right: 16px; bottom: 16px; justify-content: center; }
+}
