@@ -65,15 +65,22 @@ function clip(kind) {
 }
 
 /**
- * Play each clip muted so the autoplay policy is satisfied by the gesture that
- * called this; later programmatic plays are then allowed. Must be invoked from
- * a real user interaction.
+ * Unlock each clip using the gesture that called this, so later programmatic
+ * plays are allowed. Must be invoked from a real user interaction.
+ *
+ * Primes at volume 0 rather than `muted`. A MUTED element is exempt from the
+ * autoplay policy entirely, so muted priming always "succeeded" and reported
+ * unblocked — while the real, audible alert later was still refused. Volume 0
+ * is still an audible element as far as the policy is concerned, so this
+ * tests the permission we actually need, silently.
  */
 export async function primeSounds() {
   const results = await Promise.all(
     Object.keys(FILES).map(async (kind) => {
       const el = clip(kind)
-      el.muted = true
+      const volume = el.volume
+      el.muted = false
+      el.volume = 0
       try {
         await el.play()
         el.pause()
@@ -82,7 +89,7 @@ export async function primeSounds() {
       } catch {
         return false
       } finally {
-        el.muted = false
+        el.volume = volume
       }
     }),
   )
@@ -112,6 +119,15 @@ export function playAlert(kind) {
 }
 
 export async function toggleSound() {
+  // Blocked-but-enabled is a "let me retry" click, not a "turn it off" click:
+  // the button's own tooltip offers to allow sound, and this runs inside the
+  // click handler, so it is exactly the trusted gesture the browser wants.
+  // Without this branch the first click silently disabled alerts instead.
+  if (enabled && blocked) {
+    if (await primeSounds()) playAlert('order')
+    return
+  }
+
   if (enabled) {
     enabled = false
     blocked = false
@@ -142,12 +158,20 @@ export function useSoundAlerts() {
 
 // An operator who left alerts on last session shouldn't need to click the
 // toggle again — prime on whatever they touch first instead.
+//
+// This deliberately keeps listening until a prime actually SUCCEEDS. It used
+// to unsubscribe on the first gesture regardless of the outcome, so a single
+// failed attempt (the clips not yet loaded, or the browser not yet counting
+// the page as activated) left playback blocked permanently — no amount of
+// further clicking retried it, and only a reload cleared it.
 if (typeof document !== 'undefined') {
-  const onFirstGesture = () => {
-    document.removeEventListener('pointerdown', onFirstGesture)
-    document.removeEventListener('keydown', onFirstGesture)
-    if (enabled) primeSounds()
+  const onGesture = async () => {
+    if (!enabled) return
+    if (await primeSounds()) {
+      document.removeEventListener('pointerdown', onGesture)
+      document.removeEventListener('keydown', onGesture)
+    }
   }
-  document.addEventListener('pointerdown', onFirstGesture)
-  document.addEventListener('keydown', onFirstGesture)
+  document.addEventListener('pointerdown', onGesture)
+  document.addEventListener('keydown', onGesture)
 }
