@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
 import { useLiveReload } from '../lib/useLiveReload'
 import { useToast } from '../lib/toast'
+import { useDialogs } from '../lib/dialogs'
 import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
@@ -13,6 +14,7 @@ const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
 export default function Categories() {
   const navigate = useNavigate()
   const toast = useToast()
+  const { confirm } = useDialogs()
   const onGoAddCat = () => navigate('/categories/new')
   const [q, setQ] = useState('')
 
@@ -29,6 +31,29 @@ export default function Categories() {
 
   const { data, loading, error, reload } = useFetch(fetchAll, [])
   useLiveReload(['category.changed'], reload)
+
+  // Permanent, and the server refuses while any product still points at this
+  // category — surface that message rather than a generic failure, since it
+  // tells the owner exactly what to do first.
+  const remove = async (cat, name, itemCount) => {
+    const ok = await confirm({
+      title: `Delete "${name}"?`,
+      body:
+        itemCount > 0
+          ? `${itemCount} product(s) are still in this category. Move them elsewhere first — the delete will be refused otherwise.`
+          : 'This permanently removes the category — it cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Delete permanently',
+    })
+    if (!ok) return
+    try {
+      await api.delete(`/admin/categories/${cat.id}`)
+      reload()
+      toast.success(`"${name}" deleted`)
+    } catch (e) {
+      toast.error(e.message || 'Could not delete this category.')
+    }
+  }
 
   const toggleVisible = async (cat) => {
     try {
@@ -56,7 +81,7 @@ export default function Categories() {
         state,
         stateStyle: `display:inline-flex;background:${col[0]};color:${col[1]};font-size:12.5px;font-weight:800;padding:6px 11px;border-radius:9px;`,
         thumbStyle: 'width:46px;height:46px;border-radius:12px;flex:none;display:grid;place-items:center;overflow:hidden;background:repeating-linear-gradient(135deg,#F4F6F2 0 6px,#EDEFEB 6px 12px);',
-        rowStyle: `display:grid;grid-template-columns:56px 64px minmax(220px, 2fr) 120px 150px 96px;gap:14px;align-items:center;padding:14px 20px;min-width:920px;border-top:1px solid #F2F4F0;${
+        rowStyle: `display:grid;grid-template-columns:56px 64px minmax(220px, 2fr) 120px 150px 132px;gap:14px;align-items:center;padding:14px 20px;min-width:956px;border-top:1px solid #F2F4F0;${
           state === 'Needs fixing' ? 'background:#FFFBF2;box-shadow:inset 4px 0 0 #E39A0B;' : ''
         }`,
       }
@@ -89,7 +114,7 @@ export default function Categories() {
 
       <div className="fc-tbl" style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 18px; overflow-x: auto;')}>
         <StateBlock loading={loading} error={error} onRetry={reload} empty={!loading && !error && rows.length === 0} emptyText="No categories yet.">
-          <div className="fc-thead" style={css('display: grid; grid-template-columns: 56px 64px minmax(220px, 2fr) 120px 150px 96px; gap: 14px; padding: 13px 20px; min-width: 920px; background: #FAFBF9; font-size: 12px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px;')}>
+          <div className="fc-thead" style={css('display: grid; grid-template-columns: 56px 64px minmax(220px, 2fr) 120px 150px 132px; gap: 14px; padding: 13px 20px; min-width: 956px; background: #FAFBF9; font-size: 12px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px;')}>
             <div>Order</div><div>Image</div><div>Name (EN / AR)</div><div>Products</div><div>Status</div><div />
           </div>
 
@@ -111,13 +136,23 @@ export default function Categories() {
               </div>
               <div data-label="Products" style={css('font-size: 15px; font-weight: 800;')}>{c.items}</div>
               <div data-label="Status"><span style={css(c.stateStyle)}>{c.state}</span></div>
-              <div className="fc-act" style={css('display: flex; justify-content: flex-end;')}>
+              <div className="fc-act" style={css('display: flex; justify-content: flex-end; gap: 6px;')}>
                 <button
                   className="hv-soft"
                   onClick={() => toggleVisible(c.raw)}
                   style={css('background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 800; color: #37413A; cursor: pointer;')}
                 >
                   {c.raw.visible ? 'Hide' : 'Show'}
+                </button>
+                <button
+                  onClick={() => remove(c.raw, c.name, typeof c.items === 'number' ? c.items : 0)}
+                  title="Delete category"
+                  aria-label={`Delete ${c.name}`}
+                  style={css('background: #FFFFFF; border: 1px solid #F3B4AC; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 800; color: #B3261E; cursor: pointer; display: flex; align-items: center;')}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                  </svg>
                 </button>
               </div>
             </div>

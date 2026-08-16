@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
 import { useLiveReload } from '../lib/useLiveReload'
 import { useToast } from '../lib/toast'
+import { useDialogs } from '../lib/dialogs'
 import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
@@ -14,12 +15,13 @@ const STOCK_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Sto
 
 const THUMB = 'width:46px;height:46px;border-radius:10px;display:grid;place-items:center;background:repeating-linear-gradient(135deg,#F4F6F2 0 6px,#EDEFEB 6px 12px);overflow:hidden;'
 const VAR_THUMB = 'width:38px;height:38px;border-radius:9px;margin-left:16px;display:grid;place-items:center;background:repeating-linear-gradient(135deg,#F4F6F2 0 6px,#EDEFEB 6px 12px);'
-const ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1fr 130px 150px 96px;gap:14px;align-items:center;padding:13px 20px;min-width:1000px;border-top:1px solid #F2F4F0;'
-const VAR_ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1fr 130px 150px 96px;gap:14px;align-items:center;padding:11px 20px 11px 32px;min-width:1000px;border-top:1px solid #F6F8F4;background:#FCFDFB;'
+const ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1fr 130px 150px 132px;gap:14px;align-items:center;padding:13px 20px;min-width:1036px;border-top:1px solid #F2F4F0;'
+const VAR_ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1fr 130px 150px 132px;gap:14px;align-items:center;padding:11px 20px 11px 32px;min-width:1036px;border-top:1px solid #F6F8F4;background:#FCFDFB;'
 
 export default function Products() {
   const navigate = useNavigate()
   const toast = useToast()
+  const { confirm } = useDialogs()
   const [open, setOpen] = useState({})
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
@@ -55,6 +57,25 @@ export default function Products() {
       reload()
     } catch (e) {
       toast.error(e.message || 'Could not save that change.')
+    }
+  }
+
+  // Permanent. Past orders are unaffected because their line items snapshot
+  // the name and price at purchase time rather than reading the product back.
+  const remove = async (product, name) => {
+    const ok = await confirm({
+      title: `Delete "${name}"?`,
+      body: 'This permanently removes the product — it cannot be undone. Past orders that include it are unaffected.',
+      tone: 'danger',
+      confirmLabel: 'Delete permanently',
+    })
+    if (!ok) return
+    try {
+      await api.delete(`/admin/products/${product.id}`)
+      reload()
+      toast.success(`"${name}" deleted`)
+    } catch (e) {
+      toast.error(e.message || 'Could not delete this product.')
     }
   }
 
@@ -150,7 +171,7 @@ export default function Products() {
 
       <div className="fc-tbl" style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 18px; overflow-x: auto;')}>
         <StateBlock loading={loading} error={error} onRetry={reload} empty={!loading && !error && rows.length === 0} emptyText="No products match this search.">
-          <div className="fc-thead" style={css('display: grid; grid-template-columns: 64px minmax(240px, 2.1fr) 1fr 130px 150px 96px; gap: 14px; padding: 13px 20px; min-width: 1000px; background: #FAFBF9; font-size: 12px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px;')}>
+          <div className="fc-thead" style={css('display: grid; grid-template-columns: 64px minmax(240px, 2.1fr) 1fr 130px 150px 132px; gap: 14px; padding: 13px 20px; min-width: 1036px; background: #FAFBF9; font-size: 12px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px;')}>
             <div>Photo</div><div>Name (EN / AR)</div><div>Category</div><div>Price</div><div>Stock</div><div />
           </div>
 
@@ -221,7 +242,7 @@ export default function Products() {
                 />
               </div>
               <div data-label="Stock"><span style={css(stockPill(p.stock))}>{p.stock}</span></div>
-              <div className="fc-act" style={css('display: flex; justify-content: flex-end;')}>
+              <div className="fc-act" style={css('display: flex; justify-content: flex-end; gap: 6px;')}>
                 <button
                   className="hv-soft"
                   onClick={() => onEdit(p.product.id)}
@@ -229,11 +250,25 @@ export default function Products() {
                 >
                   Edit
                 </button>
+                {/* Variant rows are part of their parent product — deleting is a
+                    product-level action, so it only shows on the product row. */}
+                {!p.variant ? (
+                  <button
+                    onClick={() => remove(p.product, p.name)}
+                    title="Delete product"
+                    aria-label={`Delete ${p.name}`}
+                    style={css('background: #FFFFFF; border: 1px solid #F3B4AC; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 800; color: #B3261E; cursor: pointer; display: flex; align-items: center;')}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                    </svg>
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}
 
-          <div className="fc-tblfoot" style={css('display: flex; align-items: center; gap: 14px; padding: 15px 20px; min-width: 1000px; border-top: 1px solid #EFF1ED; font-size: 13.5px; color: #7B857F; font-weight: 700;')}>
+          <div className="fc-tblfoot" style={css('display: flex; align-items: center; gap: 14px; padding: 15px 20px; min-width: 1036px; border-top: 1px solid #EFF1ED; font-size: 13.5px; color: #7B857F; font-weight: 700;')}>
             Showing {products.length} of {total.toLocaleString()} products
             <div style={css('margin-left: auto; display: flex; gap: 8px;')}>
               <button
