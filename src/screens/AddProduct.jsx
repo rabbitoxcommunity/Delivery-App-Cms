@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useNavigate, useParams } from 'react-router-dom'
 import { css } from '../lib/css'
 import { fromFils, toFils } from '../lib/adapt'
 import { api } from '../lib/api'
 import { uploadImage } from '../lib/upload'
 import { useFetch } from '../lib/useFetch'
+import { useToast } from '../lib/toast'
 
 const ACCENTS = ['#47BB1C', '#E39A0B', '#B3261E']
 const STOCK_TO_STATE = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' }
@@ -15,6 +17,7 @@ const nextKey = () => `v${variantKeySeed++}`
 
 export default function AddProduct() {
   const navigate = useNavigate()
+  const toast = useToast()
   const { id: productId } = useParams()
   const onBack = () => navigate('/products')
   const [newState, onNewState] = useState('Available')
@@ -28,8 +31,8 @@ export default function AddProduct() {
     error: existingError,
   } = useFetch(() => (productId ? api.get(`/admin/products/${productId}`) : Promise.resolve(null)), [productId])
 
-  const [nameEn, setNameEn] = useState('')
-  const [nameAr, setNameAr] = useState('')
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({ defaultValues: { nameEn: '', nameAr: '' } })
+
   const [categoryId, setCategoryId] = useState('')
   const [barcode, setBarcode] = useState('')
   const [price, setPrice] = useState('')
@@ -40,13 +43,11 @@ export default function AddProduct() {
   const [published, setPublished] = useState(true)
   const [variants, setVariants] = useState([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   // Prefill when editing an existing product.
   useEffect(() => {
     if (!existing) return
-    setNameEn(existing.name?.en || '')
-    setNameAr(existing.name?.ar || '')
+    reset({ nameEn: existing.name?.en || '', nameAr: existing.name?.ar || '' })
     setCategoryId(existing.categoryId || '')
     setIcon(existing.icon || 'p-water')
     setImageUrl(existing.imageUrl || null)
@@ -85,24 +86,23 @@ export default function AddProduct() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setError('')
     try {
       const url = await uploadImage(file, 'product-image')
       setImageUrl(url)
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message || 'Could not upload this photo.')
     } finally {
       setUploading(false)
     }
   }
 
-  const buildPayload = (statusOverride) => ({
+  const buildPayload = (data) => ({
     categoryId: categoryId || null,
-    name: { en: nameEn, ar: nameAr },
+    name: { en: data.nameEn, ar: data.nameAr },
     subtitle: { en: '', ar: '' },
     icon,
     imageUrl,
-    status: statusOverride ?? (published ? 'published' : 'draft'),
+    status: published ? 'published' : 'draft',
     variants: [
       { barcode: barcode || null, price: toFils(price || 0), compareAtPrice: comparePrice ? toFils(comparePrice) : null, stock: STATE_TO_STOCK[newState] },
       ...variants.map((v) => ({
@@ -113,21 +113,18 @@ export default function AddProduct() {
     ],
   })
 
-  const save = async (andAddAnother) => {
-    setError('')
-    if (!nameEn.trim()) return setError('Product name (English) is required.')
-    if (published && !nameAr.trim()) return setError('Arabic name is required to publish (§4 Localized rule) — save as draft instead, or fill it in.')
+  const save = async (data, andAddAnother) => {
     setSaving(true)
     try {
-      const payload = buildPayload()
+      const payload = buildPayload(data)
       if (isEditing) {
         await api.patch(`/admin/products/${productId}`, payload)
       } else {
         await api.post('/admin/products', payload)
       }
+      toast.success(isEditing ? 'Product updated' : 'Product created')
       if (andAddAnother) {
-        setNameEn('')
-        setNameAr('')
+        reset({ nameEn: '', nameAr: '' })
         setBarcode('')
         setPrice('')
         setComparePrice('')
@@ -138,7 +135,7 @@ export default function AddProduct() {
         onBack()
       }
     } catch (err) {
-      setError(err.message || 'Could not save this product.')
+      toast.error(err.message || 'Could not save this product.')
     } finally {
       setSaving(false)
     }
@@ -175,12 +172,6 @@ export default function AddProduct() {
         Back to products
       </button>
 
-      {error ? (
-        <div style={css('background: #FFF1EF; border: 1px solid #F3B4AC; color: #B3261E; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; font-weight: 700;')}>
-          {error}
-        </div>
-      ) : null}
-
       <div style={css('display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start;')}>
         <div style={css('display: flex; flex-direction: column; gap: 16px;')}>
           <div style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 20px; padding: 24px;')}>
@@ -189,11 +180,24 @@ export default function AddProduct() {
             <div style={css('display: flex; flex-direction: column; gap: 14px; margin-top: 18px;')}>
               <div>
                 <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Product name (English)</div>
-                <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Almarai Fresh Milk 2L" style={css('width: 100%; padding: 15px 16px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 16px; font-weight: 700;')} />
+                <input
+                  placeholder="e.g. Almarai Fresh Milk 2L"
+                  style={css(`width: 100%; padding: 15px 16px; border: 1px solid ${errors.nameEn ? '#E7998F' : '#E4EADF'}; border-radius: 12px; font-size: 16px; font-weight: 700; background: ${errors.nameEn ? '#FFFBFA' : '#FFFFFF'};`)}
+                  {...register('nameEn', { required: 'Product name (English) is required.' })}
+                />
+                {errors.nameEn ? <div className="fc-fade-up" style={css('font-size: 12px; font-weight: 700; color: #C0392B; margin-top: 5px;')}>{errors.nameEn.message}</div> : null}
               </div>
               <div>
                 <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>اسم المنتج (Arabic)</div>
-                <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: ألمراي حليب طازج ٢ لتر" dir="rtl" style={css('width: 100%; padding: 15px 16px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 16px; font-weight: 700;')} />
+                <input
+                  dir="rtl"
+                  placeholder="مثال: ألمراي حليب طازج ٢ لتر"
+                  style={css(`width: 100%; padding: 15px 16px; border: 1px solid ${errors.nameAr ? '#E7998F' : '#E4EADF'}; border-radius: 12px; font-size: 16px; font-weight: 700; background: ${errors.nameAr ? '#FFFBFA' : '#FFFFFF'};`)}
+                  {...register('nameAr', {
+                    validate: (v) => (published && !v.trim() ? 'Arabic name is required to publish — save as draft instead, or fill it in.' : true),
+                  })}
+                />
+                {errors.nameAr ? <div className="fc-fade-up" style={css('font-size: 12px; font-weight: 700; color: #C0392B; margin-top: 5px;')}>{errors.nameAr.message}</div> : null}
               </div>
               <div>
                 <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Category</div>
@@ -260,7 +264,7 @@ export default function AddProduct() {
             </div>
             <div style={css('display: flex; flex-direction: column; gap: 10px; margin-top: 16px;')}>
               {variants.map((v) => (
-                <div key={v.key} style={css('display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: #FAFBF9; border: 1px solid #EFF1ED; border-radius: 14px; padding: 12px 14px;')}>
+                <div key={v.key} className="fc-fade-up" style={css('display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: #FAFBF9; border: 1px solid #EFF1ED; border-radius: 14px; padding: 12px 14px;')}>
                   <input
                     value={v.labelEn}
                     onChange={(e) => updateVariant(v.key, { labelEn: e.target.value })}
@@ -359,13 +363,13 @@ export default function AddProduct() {
                 type="button"
                 className="hv-green"
                 disabled={saving}
-                onClick={() => save(false)}
+                onClick={handleSubmit((data) => save(data, false))}
                 style={css(`background: ${saving ? '#8FCE6C' : '#47BB1C'}; color: #FFFFFF; border: none; border-radius: 14px; padding: 17px 20px; font-size: 16px; font-weight: 800; cursor: ${saving ? 'default' : 'pointer'};`)}
               >
                 {saving ? 'Saving…' : 'Save product'}
               </button>
               {!isEditing ? (
-                <button type="button" className="hv-soft" disabled={saving} onClick={() => save(true)} style={css('background: #FFFFFF; color: #37413A; border: 1px solid #E4EADF; border-radius: 14px; padding: 15px 20px; font-size: 15px; font-weight: 800; cursor: pointer;')}>
+                <button type="button" className="hv-soft" disabled={saving} onClick={handleSubmit((data) => save(data, true))} style={css('background: #FFFFFF; color: #37413A; border: 1px solid #E4EADF; border-radius: 14px; padding: 15px 20px; font-size: 15px; font-weight: 800; cursor: pointer;')}>
                   Save &amp; add another
                 </button>
               ) : null}

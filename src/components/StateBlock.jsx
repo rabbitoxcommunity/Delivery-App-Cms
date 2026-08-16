@@ -1,11 +1,14 @@
 import { css } from '../lib/css'
+import { SkeletonRow } from './Skeleton'
 
 /** Loading / error / empty placeholder, styled to match the table/card chrome used everywhere else. */
 export default function StateBlock({ loading, error, empty, emptyText, onRetry, children }) {
   if (loading) {
     return (
-      <div style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 18px; padding: 40px; text-align: center; font-size: 14.5px; font-weight: 700; color: #7B857F;')}>
-        Loading…
+      <div style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 18px; padding: 8px 0; display: flex; flex-direction: column;')}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonRow key={i} columns={4} />
+        ))}
       </div>
     )
   }

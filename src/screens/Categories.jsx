@@ -4,12 +4,14 @@ import { css } from '../lib/css'
 import { localized } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useToast } from '../lib/toast'
 import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
 
 export default function Categories() {
   const navigate = useNavigate()
+  const toast = useToast()
   const onGoAddCat = () => navigate('/categories/new')
   const [q, setQ] = useState('')
 
@@ -27,8 +29,13 @@ export default function Categories() {
   const { data, loading, error, reload } = useFetch(fetchAll, [])
 
   const toggleVisible = async (cat) => {
-    await api.patch(`/admin/categories/${cat.id}`, { visible: !cat.visible })
-    reload()
+    try {
+      await api.patch(`/admin/categories/${cat.id}`, { visible: !cat.visible })
+      reload()
+      toast.success(cat.visible ? 'Category hidden' : 'Category shown')
+    } catch (e) {
+      toast.error(e.message || 'Could not update this category.')
+    }
   }
 
   const categories = data?.categories || []
@@ -84,8 +91,8 @@ export default function Categories() {
             <div>Order</div><div>Image</div><div>Name (EN / AR)</div><div>Products</div><div>Status</div><div />
           </div>
 
-          {rows.map((c) => (
-            <div key={c.raw.id} className="fc-row" style={css(c.rowStyle)}>
+          {rows.map((c, i) => (
+            <div key={c.raw.id} className="fc-row fc-fade-up" style={{ ...css(c.rowStyle), animationDelay: `${Math.min(i, 12) * 18}ms` }}>
               <div className="fc-drag" style={css('display: flex; align-items: center; gap: 8px; color: #B7BFB8;')}>
                 <span style={css('font-size: 13.5px; font-weight: 800; color: #7B857F;')}>{c.order}</span>
               </div>

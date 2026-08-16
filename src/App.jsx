@@ -98,7 +98,7 @@ function Shell() {
         <main style={css('min-width: 0; display: flex; flex-direction: column;')}>
           <Header onOpenNav={() => setNavOpen(true)} />
 
-          <div className="fc-content" style={css('padding: 26px 30px 40px; display: flex; flex-direction: column; gap: 20px;')}>
+          <div key={location.pathname} className="fc-content fc-fade-up" style={css('padding: 26px 30px 40px; display: flex; flex-direction: column; gap: 20px;')}>
             <Outlet context={{ live, openOrder: setSelected }} />
           </div>
         </main>

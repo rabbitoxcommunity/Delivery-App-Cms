@@ -5,6 +5,7 @@ import { PROPS, stockPill } from '../lib/design'
 import { fromFils, localized, toFils } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useToast } from '../lib/toast'
 import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
@@ -17,6 +18,7 @@ const VAR_ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1f
 
 export default function Products() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [open, setOpen] = useState({})
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
@@ -46,8 +48,12 @@ export default function Products() {
   }
 
   const saveField = async (product, patch) => {
-    await api.patch(`/admin/products/${product.id}`, patch)
-    reload()
+    try {
+      await api.patch(`/admin/products/${product.id}`, patch)
+      reload()
+    } catch (e) {
+      toast.error(e.message || 'Could not save that change.')
+    }
   }
 
   const products = data?.items || []
@@ -120,7 +126,7 @@ export default function Products() {
         </button>
         <button
           className="hv-green"
-          onClick={() => window.alert('Excel import is coming soon — the backend endpoint exists but this screen isn’t wired to it yet.')}
+          onClick={() => toast.info('Excel import is coming soon', { body: "The backend endpoint exists but this screen isn't wired to it yet." })}
           style={css('display: flex; align-items: center; gap: 9px; background: #47BB1C; color: #FFFFFF; border: none; border-radius: 14px; padding: 15px 20px; font-size: 14.5px; font-weight: 800; cursor: pointer;')}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 16V4M8 8l4-4 4 4M4 20h16" /></svg>
@@ -146,8 +152,8 @@ export default function Products() {
             <div>Photo</div><div>Name (EN / AR)</div><div>Category</div><div>Price</div><div>Stock</div><div />
           </div>
 
-          {rows.map((p) => (
-            <div key={p.key} className="fc-row" style={css(p.rowStyle)}>
+          {rows.map((p, i) => (
+            <div key={p.key} className="fc-row fc-fade-up" style={{ ...css(p.rowStyle), animationDelay: `${Math.min(i, 12) * 18}ms` }}>
               <div style={css(p.variant ? VAR_THUMB : THUMB)}>
                 {p.imageUrl ? (
                   <img src={p.imageUrl} alt="" style={css('width: 100%; height: 100%; object-fit: cover;')} />

@@ -1,10 +1,13 @@
 import { useCallback, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { css } from '../lib/css'
 import { chip } from '../lib/design'
 import { STATUS_TO_LABEL } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../lib/auth'
+import { useToast } from '../lib/toast'
+import { Field, inputStyle } from '../components/FormField'
 import StateBlock from '../components/StateBlock'
 
 const AVAIL_LABEL = { available: 'Available', on_delivery: 'On delivery', off_shift: 'Off shift' }
@@ -121,59 +124,65 @@ export default function Staff() {
 }
 
 function AddDriverModal({ onClose, onSaved }) {
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [plate, setPlate] = useState('')
-  const [vehicleType, setVehicleType] = useState('bike')
-  const [password, setPassword] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
+  const toast = useToast()
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+    defaultValues: { name: '', phone: '', plate: '', vehicleType: 'bike', password: '' },
+  })
 
-  const save = async () => {
-    setErr('')
-    if (!name.trim() || !phone.trim() || password.length < 8) {
-      return setErr('Name, phone and a password of at least 8 characters are required.')
-    }
-    setBusy(true)
+  const save = async (data) => {
     try {
       await api.post('/admin/staff', {
         role: 'deliveryStaff',
-        name,
-        phone,
-        password,
-        vehicle: plate ? { type: vehicleType, plate } : undefined,
+        name: data.name,
+        phone: data.phone,
+        password: data.password,
+        vehicle: data.plate ? { type: data.vehicleType, plate: data.plate } : undefined,
       })
+      toast.success('Driver added')
       onSaved()
     } catch (e) {
-      setErr(e.message || 'Could not add this driver.')
-    } finally {
-      setBusy(false)
+      toast.error(e.message || 'Could not add this driver.')
     }
   }
 
   return (
-    <div style={css('position: fixed; inset: 0; background: rgba(15,26,18,.42); display: flex; align-items: center; justify-content: center; z-index: 30;')}>
-      <div style={css('background: #FFFFFF; border-radius: 20px; padding: 26px; width: 380px; max-width: 90vw; display: flex; flex-direction: column; gap: 12px;')}>
+    <div className="fc-backdrop" onClick={onClose} style={css('position: fixed; inset: 0; background: rgba(15,26,18,.42); display: flex; align-items: center; justify-content: center; z-index: 30;')}>
+      <form onSubmit={handleSubmit(save)} onClick={(e) => e.stopPropagation()} className="fc-modal" style={css('background: #FFFFFF; border-radius: 20px; padding: 26px; width: 380px; max-width: 90vw; display: flex; flex-direction: column; gap: 12px;')}>
         <div style={css('font-size: 18px; font-weight: 800;')}>Add delivery driver</div>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" style={css('padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 600;')} />
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+971 5X XXX XXXX" style={css('padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 600;')} />
+
+        <Field label="Full name" error={errors.name}>
+          <input autoFocus style={inputStyle(errors.name)} placeholder="Full name" {...register('name', { required: 'Name is required' })} />
+        </Field>
+
+        <Field label="Phone" error={errors.phone}>
+          <input style={inputStyle(errors.phone)} placeholder="+971 5X XXX XXXX" {...register('phone', { required: 'Phone is required' })} />
+        </Field>
+
         <div style={css('display: flex; gap: 8px;')}>
-          <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} style={css('flex: 1; padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 14px; font-weight: 700; background: #FFFFFF;')}>
+          <select style={{ ...inputStyle(), flex: 1, background: '#FFFFFF' }} {...register('vehicleType')}>
             <option value="bike">Bike</option>
             <option value="van">Van</option>
             <option value="car">Car</option>
           </select>
-          <input value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="Plate (optional)" style={css('flex: 1; padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 14px; font-weight: 600;')} />
+          <input style={{ ...inputStyle(), flex: 1 }} placeholder="Plate (optional)" {...register('plate')} />
         </div>
-        <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Temporary password (min 8 chars)" style={css('padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 600;')} />
-        {err ? <div style={css('font-size: 13px; font-weight: 700; color: #B3261E;')}>{err}</div> : null}
+
+        <Field label="Temporary password" error={errors.password} hint={!errors.password ? 'At least 8 characters.' : undefined}>
+          <input
+            type="password"
+            style={inputStyle(errors.password)}
+            placeholder="Temporary password"
+            {...register('password', { required: 'Password is required', minLength: { value: 8, message: 'At least 8 characters' } })}
+          />
+        </Field>
+
         <div style={css('display: flex; gap: 10px; margin-top: 6px;')}>
-          <button onClick={save} disabled={busy} style={css('flex: 1; background: #7A4BD0; color: #FFFFFF; border: none; border-radius: 12px; padding: 13px 16px; font-size: 14.5px; font-weight: 800; cursor: pointer;')}>
-            {busy ? 'Adding…' : 'Add driver'}
+          <button type="submit" disabled={isSubmitting} style={css(`flex: 1; background: ${isSubmitting ? '#B79BE8' : '#7A4BD0'}; color: #FFFFFF; border: none; border-radius: 12px; padding: 13px 16px; font-size: 14.5px; font-weight: 800; cursor: ${isSubmitting ? 'default' : 'pointer'};`)}>
+            {isSubmitting ? 'Adding…' : 'Add driver'}
           </button>
-          <button onClick={onClose} style={css('background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 12px; padding: 13px 16px; font-size: 14.5px; font-weight: 800; cursor: pointer;')}>Cancel</button>
+          <button type="button" onClick={onClose} style={css('background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 12px; padding: 13px 16px; font-size: 14.5px; font-weight: 800; cursor: pointer;')}>Cancel</button>
         </div>
-      </div>
+      </form>
     </div>
   )
 }

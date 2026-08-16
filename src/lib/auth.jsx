@@ -1,7 +1,23 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { api, hasSession, request, setTokens, setUnauthorizedHandler } from './api'
 
-const TENANT_SLUG = import.meta.env.VITE_TENANT_SLUG || ''
+const DEFAULT_TENANT_SLUG = import.meta.env.VITE_TENANT_SLUG || ''
+const TENANT_SLUG_KEY = 'fc_admin_tenant_slug'
+
+// A production build is one deployment per tenant, baked in at build time via
+// VITE_TENANT_SLUG — there's no picker. Locally, testing against whichever
+// tenant Superadmin just spun up would otherwise mean editing .env and
+// restarting Vite every time, so the login screen lets you type a slug and
+// it's remembered here instead. Never used by a real single-tenant deploy
+// unless someone explicitly overrides it.
+export function getStoredTenantSlug() {
+  return localStorage.getItem(TENANT_SLUG_KEY) || DEFAULT_TENANT_SLUG
+}
+
+export function setStoredTenantSlug(slug) {
+  if (slug) localStorage.setItem(TENANT_SLUG_KEY, slug)
+  else localStorage.removeItem(TENANT_SLUG_KEY)
+}
 
 const AuthContext = createContext(null)
 
@@ -39,12 +55,14 @@ export function AuthProvider({ children }) {
     }
   }, [status, signOut])
 
-  const signIn = useCallback(async (email, password) => {
+  const signIn = useCallback(async (email, password, tenantSlug) => {
+    const slug = (tenantSlug || getStoredTenantSlug() || '').trim()
     const result = await api.post(
       '/auth/staff/login',
-      { tenantSlug: TENANT_SLUG, email, password },
+      { tenantSlug: slug, email, password },
       { skipAuth: true },
     )
+    setStoredTenantSlug(slug)
     setTokens(result)
     setUser(result.user)
     setStatus('signedIn')

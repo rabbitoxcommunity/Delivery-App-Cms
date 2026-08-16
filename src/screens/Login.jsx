@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { css } from '../lib/css'
-import { useAuth } from '../lib/auth'
+import { useAuth, getStoredTenantSlug } from '../lib/auth'
 
 export default function Login() {
   const { signIn } = useAuth()
+  const [tenantSlug, setTenantSlug] = useState(getStoredTenantSlug())
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -14,7 +15,7 @@ export default function Login() {
     setError('')
     setBusy(true)
     try {
-      await signIn(email, password)
+      await signIn(email, password, tenantSlug)
     } catch (err) {
       setError(err.message || 'Could not sign in.')
     } finally {
@@ -30,6 +31,7 @@ export default function Login() {
     >
       <form
         onSubmit={submit}
+        className="fc-fade-up"
         style={css(
           'width: 100%; max-width: 380px; background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 18px;',
         )}
@@ -56,6 +58,7 @@ export default function Login() {
 
         {error ? (
           <div
+            className="fc-fade-up"
             style={css(
               'background: #FFF1EF; border: 1px solid #F3B4AC; color: #B3261E; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; font-weight: 700;',
             )}
@@ -66,12 +69,26 @@ export default function Login() {
 
         <div>
           <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>
+            Login Key <span style={css('text-transform: none; font-weight: 600; color: #9AA39C;')}>(tenant slug)</span>
+          </div>
+          <input
+            type="text"
+            required
+            autoFocus
+            value={tenantSlug}
+            onChange={(e) => setTenantSlug(e.target.value.trim())}
+            placeholder="freshcart-demo"
+            style={css('width: 100%; padding: 14px 15px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 700; font-family: ui-monospace, Menlo, monospace;')}
+          />
+        </div>
+
+        <div>
+          <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>
             Email
           </div>
           <input
             type="email"
             required
-            autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="owner@freshcart-demo.test"

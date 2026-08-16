@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { css } from '../lib/css'
 import { GREEN, money } from '../lib/design'
 import { fromFils, toFils } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useToast } from '../lib/toast'
+import { Field, inputStyle } from '../components/FormField'
 import { recordCreditPayment } from '../lib/ordersData'
 import StateBlock from '../components/StateBlock'
 
@@ -18,31 +21,6 @@ function initialsOf(name) {
 export default function Credit() {
   const { data, loading, error, reload } = useFetch(() => api.get('/admin/credit'), [])
   const [settling, setSettling] = useState(null)
-  const [amount, setAmount] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-
-  const openSettle = (account) => {
-    setSettling(account)
-    setAmount(fromFils(account.balance).toFixed(2))
-    setErr('')
-  }
-
-  const confirmSettle = async () => {
-    const fils = toFils(amount)
-    if (!Number.isFinite(fils) || fils <= 0) return setErr('Enter a valid amount.')
-    setBusy(true)
-    setErr('')
-    try {
-      await recordCreditPayment(settling.customerId, fils)
-      setSettling(null)
-      reload()
-    } catch (e) {
-      setErr(e.message || 'Could not record this payment.')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const accounts = data?.accounts || []
 
@@ -95,7 +73,7 @@ export default function Credit() {
                   </div>
                   <div className="fc-act" style={css('display: flex; justify-content: flex-end;')}>
                     <button
-                      onClick={() => openSettle(a)}
+                      onClick={() => setSettling(a)}
                       style={css(`background:${overdue ? '#B3261E' : GREEN};color:#FFFFFF;border:none;border-radius:11px;padding:11px 20px;font-size:14px;font-weight:800;cursor:pointer;`)}
                     >
                       Settle
@@ -109,30 +87,66 @@ export default function Credit() {
       </StateBlock>
 
       {settling ? (
-        <div style={css('position: fixed; inset: 0; background: rgba(15,26,18,.42); display: flex; align-items: center; justify-content: center; z-index: 30;')}>
-          <div style={css('background: #FFFFFF; border-radius: 20px; padding: 26px; width: 360px; max-width: 90vw; display: flex; flex-direction: column; gap: 14px;')}>
-            <div style={css('font-size: 18px; font-weight: 800;')}>Record payment</div>
-            <div style={css('font-size: 13.5px; color: #7B857F; font-weight: 600;')}>{settling.customer?.name} · outstanding {money(fromFils(settling.balance))}</div>
-            <div>
-              <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Amount (AED)</div>
-              <input value={amount} onChange={(e) => setAmount(e.target.value)} style={css('width: 100%; padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 18px; font-weight: 800;')} />
-            </div>
-            {err ? <div style={css('font-size: 13px; font-weight: 700; color: #B3261E;')}>{err}</div> : null}
-            <div style={css('display: flex; gap: 10px;')}>
-              <button
-                onClick={confirmSettle}
-                disabled={busy}
-                style={css(`flex:1;background:${GREEN};color:#FFFFFF;border:none;border-radius:12px;padding:13px 16px;font-size:14.5px;font-weight:800;cursor:pointer;`)}
-              >
-                {busy ? 'Recording…' : 'Record payment'}
-              </button>
-              <button onClick={() => setSettling(null)} style={css('background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 12px; padding: 13px 16px; font-size: 14.5px; font-weight: 800; cursor: pointer;')}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+        <SettleModal
+          account={settling}
+          onClose={() => setSettling(null)}
+          onSettled={() => {
+            setSettling(null)
+            reload()
+          }}
+        />
       ) : null}
+    </div>
+  )
+}
+
+function SettleModal({ account, onClose, onSettled }) {
+  const toast = useToast()
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+    defaultValues: { amount: fromFils(account.balance).toFixed(2) },
+  })
+
+  const confirmSettle = async (data) => {
+    const fils = toFils(data.amount)
+    try {
+      await recordCreditPayment(account.customerId, fils)
+      toast.success('Payment recorded')
+      onSettled()
+    } catch (e) {
+      toast.error(e.message || 'Could not record this payment.')
+    }
+  }
+
+  return (
+    <div className="fc-backdrop" onClick={onClose} style={css('position: fixed; inset: 0; background: rgba(15,26,18,.42); display: flex; align-items: center; justify-content: center; z-index: 30;')}>
+      <form onSubmit={handleSubmit(confirmSettle)} onClick={(e) => e.stopPropagation()} className="fc-modal" style={css('background: #FFFFFF; border-radius: 20px; padding: 26px; width: 360px; max-width: 90vw; display: flex; flex-direction: column; gap: 14px;')}>
+        <div style={css('font-size: 18px; font-weight: 800;')}>Record payment</div>
+        <div style={css('font-size: 13.5px; color: #7B857F; font-weight: 600;')}>{account.customer?.name} · outstanding {money(fromFils(account.balance))}</div>
+
+        <Field label="Amount (AED)" error={errors.amount}>
+          <input
+            autoFocus
+            style={{ ...inputStyle(errors.amount), fontSize: 18, fontWeight: 800 }}
+            {...register('amount', {
+              required: 'Enter an amount',
+              validate: (v) => (Number.isFinite(toFils(v)) && toFils(v) > 0) || 'Enter a valid amount.',
+            })}
+          />
+        </Field>
+
+        <div style={css('display: flex; gap: 10px;')}>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            style={css(`flex:1;background:${isSubmitting ? '#8FCE6C' : GREEN};color:#FFFFFF;border:none;border-radius:12px;padding:13px 16px;font-size:14.5px;font-weight:800;cursor:${isSubmitting ? 'default' : 'pointer'};`)}
+          >
+            {isSubmitting ? 'Recording…' : 'Record payment'}
+          </button>
+          <button type="button" onClick={onClose} style={css('background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 12px; padding: 13px 16px; font-size: 14.5px; font-weight: 800; cursor: pointer;')}>
+            Cancel
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

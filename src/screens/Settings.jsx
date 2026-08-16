@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { css } from '../lib/css'
 import { localized } from '../lib/adapt'
 import { api } from '../lib/api'
 import { uploadImage } from '../lib/upload'
 import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../lib/auth'
+import { useToast } from '../lib/toast'
 import StateBlock from '../components/StateBlock'
 
 const PAYMENT_LABELS = { card: 'Card payments', credit: 'Shop credit (ledger)', cash: 'Cash' }
@@ -12,6 +13,7 @@ const PAYMENT_LABELS = { card: 'Card payments', credit: 'Shop credit (ledger)', 
 export default function Settings() {
   const { hasGrade } = useAuth()
   const canEdit = hasGrade('owner')
+  const toast = useToast()
 
   const fetchAll = useCallback(async () => {
     const [config, methods] = await Promise.all([api.get('/admin/config'), api.get('/admin/payment-methods')])
@@ -20,19 +22,21 @@ export default function Settings() {
 
   const { data, loading, error, reload } = useFetch(fetchAll, [])
   const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [err, setErr] = useState('')
+  const [locating, setLocating] = useState(false)
+  const latRef = useRef(null)
+  const lngRef = useRef(null)
 
   if (loading || error) return <StateBlock loading={loading} error={error} onRetry={reload} />
 
   const { config, methods } = data
 
   const saveConfig = async (patch) => {
-    setErr('')
     try {
       await api.put('/admin/config', patch)
       reload()
+      toast.success('Saved')
     } catch (e) {
-      setErr(e.message || 'Could not save this change.')
+      toast.error(e.message || 'Could not save this change.')
     }
   }
 
@@ -42,25 +46,60 @@ export default function Settings() {
     setUploadingLogo(true)
     try {
       const logoUrl = await uploadImage(file, 'tenant-logo')
-      await saveConfig({ branding: { logoUrl } })
+      await api.put('/admin/config', { branding: { logoUrl } })
+      reload()
+      toast.success('Logo updated')
     } catch (e) {
-      setErr(e.message)
+      toast.error(e.message || 'Could not upload this logo.')
     } finally {
       setUploadingLogo(false)
     }
   }
 
   const togglePayment = async (method) => {
-    await api.patch(`/admin/payment-methods/${method.id}`, { enabled: !method.enabled })
-    reload()
+    try {
+      await api.patch(`/admin/payment-methods/${method.id}`, { enabled: !method.enabled })
+      reload()
+      toast.success(`${PAYMENT_LABELS[method.kind] || localized(method.title)} ${method.enabled ? 'disabled' : 'enabled'}`)
+    } catch (e) {
+      toast.error(e.message || 'Could not update this payment method.')
+    }
+  }
+
+  // lat/lng replace `store.geo` as a whole (the backend does a shallow merge
+  // one level deep, not a recursive one) — so both must always be sent
+  // together, never saved independently off a single field's onBlur.
+  const saveGeo = (rawLat, rawLng) => {
+    const lat = Number(rawLat)
+    const lng = Number(rawLng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    saveConfig({ store: { geo: { lat, lng } } })
+  }
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Location is not available in this browser.')
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        if (latRef.current) latRef.current.value = latitude.toFixed(6)
+        if (lngRef.current) lngRef.current.value = longitude.toFixed(6)
+        saveGeo(latitude, longitude)
+        setLocating(false)
+      },
+      () => {
+        toast.error('Could not get your location.')
+        setLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
   }
 
   return (
     <div style={css('display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 16px; align-items: start;')}>
-      {err ? (
-        <div style={css('grid-column: 1 / -1; background: #FFF1EF; border: 1px solid #F3B4AC; color: #B3261E; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; font-weight: 700;')}>{err}</div>
-      ) : null}
-
       <div style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 20px; padding: 24px;')}>
         <div style={css('font-size: 17px; font-weight: 800;')}>Shop profile &amp; branding</div>
         <div style={css('display: flex; flex-direction: column; gap: 14px; margin-top: 18px;')}>
@@ -191,6 +230,72 @@ export default function Settings() {
                 }}
                 style={css('width: 100%; padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 700;')}
               />
+            </div>
+          </div>
+        </div>
+
+        <div style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 20px; padding: 24px;')}>
+          <div style={css('font-size: 17px; font-weight: 800;')}>Shop location</div>
+          <div style={css('font-size: 13px; color: #7B857F; font-weight: 600; margin-top: 3px;')}>Used to show your shop on the map and sort it by distance in the customer app.</div>
+          <div style={css('display: flex; flex-direction: column; gap: 14px; margin-top: 16px;')}>
+            <div>
+              <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Address (English)</div>
+              <input
+                defaultValue={config.store?.address?.en || ''}
+                disabled={!canEdit}
+                placeholder="e.g. Al Wasl Road, Dubai"
+                onBlur={(e) => {
+                  if (e.target.value !== (config.store?.address?.en || '')) {
+                    saveConfig({ store: { address: { en: e.target.value, ar: config.store?.address?.ar || '' } } })
+                  }
+                }}
+                style={css('width: 100%; padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 700;')}
+              />
+            </div>
+            <div>
+              <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>العنوان (Arabic)</div>
+              <input
+                dir="rtl"
+                defaultValue={config.store?.address?.ar || ''}
+                disabled={!canEdit}
+                onBlur={(e) => {
+                  if (e.target.value !== (config.store?.address?.ar || '')) {
+                    saveConfig({ store: { address: { en: config.store?.address?.en || '', ar: e.target.value } } })
+                  }
+                }}
+                style={css('width: 100%; padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 700;')}
+              />
+            </div>
+            <div>
+              <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Coordinates</div>
+              <div style={css('display: flex; gap: 10px;')}>
+                <input
+                  ref={latRef}
+                  defaultValue={config.store?.geo?.lat ?? ''}
+                  disabled={!canEdit}
+                  placeholder="Latitude"
+                  onBlur={() => saveGeo(latRef.current?.value, lngRef.current?.value)}
+                  style={css('flex: 1; min-width: 0; padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 14.5px; font-weight: 700; font-family: ui-monospace, Menlo, monospace;')}
+                />
+                <input
+                  ref={lngRef}
+                  defaultValue={config.store?.geo?.lng ?? ''}
+                  disabled={!canEdit}
+                  placeholder="Longitude"
+                  onBlur={() => saveGeo(latRef.current?.value, lngRef.current?.value)}
+                  style={css('flex: 1; min-width: 0; padding: 13px 14px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 14.5px; font-weight: 700; font-family: ui-monospace, Menlo, monospace;')}
+                />
+              </div>
+              {canEdit ? (
+                <button
+                  type="button"
+                  onClick={useMyLocation}
+                  disabled={locating}
+                  style={css(`margin-top: 10px; background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 11px; padding: 11px 16px; font-size: 13.5px; font-weight: 800; color: #37413A; cursor: ${locating ? 'default' : 'pointer'};`)}
+                >
+                  {locating ? 'Getting your location…' : 'Use my current location'}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

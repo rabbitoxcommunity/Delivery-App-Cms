@@ -3,10 +3,13 @@ import { css } from '../lib/css'
 import { FLOWS, GREEN, chip, money } from '../lib/design'
 import { decorate } from '../lib/orders'
 import { fromFils, localized } from '../lib/adapt'
+import { useToast } from '../lib/toast'
+import { useDialogs } from '../lib/dialogs'
 
 export default function OrderDrawer({ order, onClose, onAdvance, onCancel }) {
+  const toast = useToast()
+  const { promptText } = useDialogs()
   const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
 
   if (!order) return null
 
@@ -32,27 +35,33 @@ export default function OrderDrawer({ order, onClose, onAdvance, onCancel }) {
   }))
 
   const advance = async () => {
-    setErr('')
     setBusy(true)
     try {
       await onAdvance(sel.id)
     } catch (e) {
-      setErr(e.message || 'Could not update this order.')
+      toast.error(e.message || 'Could not update this order.')
     } finally {
       setBusy(false)
     }
   }
 
   const cancel = async () => {
-    const reason = window.prompt('Reason for cancelling this order?')
+    const reason = await promptText({
+      title: 'Cancel this order?',
+      body: 'This tells the customer their order was cancelled. Give a short reason.',
+      placeholder: 'Reason for cancelling',
+      confirmLabel: 'Cancel order',
+      cancelLabel: 'Never mind',
+      tone: 'danger',
+    })
     if (reason == null) return
-    setErr('')
     setBusy(true)
     try {
       await onCancel(sel.id, reason)
+      toast.success('Order cancelled')
       onClose()
     } catch (e) {
-      setErr(e.message || 'Could not cancel this order.')
+      toast.error(e.message || 'Could not cancel this order.')
     } finally {
       setBusy(false)
     }
@@ -142,12 +151,6 @@ export default function OrderDrawer({ order, onClose, onAdvance, onCancel }) {
               : `No delivery fee for curbside · paid by ${payLabel}`}
           </div>
         </div>
-
-        {err ? (
-          <div style={css('background: #FFF1EF; border: 1px solid #F3B4AC; color: #B3261E; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; font-weight: 700;')}>
-            {err}
-          </div>
-        ) : null}
 
         {!cancelled ? (
           <div className="fc-drawer-cta" style={css('margin-top: auto; display: flex; gap: 10px;')}>

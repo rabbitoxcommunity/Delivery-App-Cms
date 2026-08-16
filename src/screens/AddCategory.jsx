@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { css } from '../lib/css'
 import { GREEN } from '../lib/design'
@@ -6,6 +7,7 @@ import { localized } from '../lib/adapt'
 import { api } from '../lib/api'
 import { uploadImage } from '../lib/upload'
 import { useFetch } from '../lib/useFetch'
+import { useToast } from '../lib/toast'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
 
@@ -18,11 +20,12 @@ const slugify = (s) =>
 
 export default function AddCategory() {
   const navigate = useNavigate()
+  const toast = useToast()
   const onBack = () => navigate('/categories')
   const { data: categories } = useFetch(() => api.get('/admin/categories'), [])
 
-  const [nameEn, setNameEn] = useState('')
-  const [nameAr, setNameAr] = useState('')
+  const { register, handleSubmit, formState: { errors } } = useForm({ defaultValues: { nameEn: '', nameAr: '' } })
+
   const [parentId, setParentId] = useState('')
   const [icon, setIcon] = useState(CATEGORY_ICONS[0])
   const [imageUrl, setImageUrl] = useState(null)
@@ -32,17 +35,15 @@ export default function AddCategory() {
   const [productResults, setProductResults] = useState([])
   const [selectedProducts, setSelectedProducts] = useState([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   const onUploadImage = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setError('')
     try {
       setImageUrl(await uploadImage(file, 'category-tile'))
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message || 'Could not upload this image.')
     } finally {
       setUploading(false)
     }
@@ -59,22 +60,19 @@ export default function AddCategory() {
     setSelectedProducts((prev) => (prev.some((x) => x.id === p.id) ? prev.filter((x) => x.id !== p.id) : [...prev, p]))
   }
 
-  const save = async () => {
-    setError('')
-    if (!nameEn.trim()) return setError('Category name (English) is required.')
-    if (!nameAr.trim()) return setError('Arabic name is required to publish.')
+  const save = async (data) => {
     setSaving(true)
     try {
       let categoryId
       if (parentId) {
         const parent = categories.find((c) => c.id === parentId)
-        const subcategories = [...(parent.subcategories || []), { slug: slugify(nameEn), name: { en: nameEn, ar: nameAr } }]
+        const subcategories = [...(parent.subcategories || []), { slug: slugify(data.nameEn), name: { en: data.nameEn, ar: data.nameAr } }]
         await api.patch(`/admin/categories/${parentId}`, { subcategories })
         categoryId = parentId
       } else {
         const created = await api.post('/admin/categories', {
-          slug: slugify(nameEn),
-          name: { en: nameEn, ar: nameAr },
+          slug: slugify(data.nameEn),
+          name: { en: data.nameEn, ar: data.nameAr },
           icon,
           imageUrl,
           visible,
@@ -83,9 +81,10 @@ export default function AddCategory() {
         categoryId = created.id
       }
       await Promise.all(selectedProducts.map((p) => api.patch(`/admin/products/${p.id}`, { categoryId })))
+      toast.success('Category saved')
       onBack()
     } catch (err) {
-      setError(err.message || 'Could not save this category.')
+      toast.error(err.message || 'Could not save this category.')
     } finally {
       setSaving(false)
     }
@@ -98,10 +97,6 @@ export default function AddCategory() {
         Back to categories
       </button>
 
-      {error ? (
-        <div style={css('background: #FFF1EF; border: 1px solid #F3B4AC; color: #B3261E; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; font-weight: 700;')}>{error}</div>
-      ) : null}
-
       <div style={css('display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start;')}>
         <div style={css('display: flex; flex-direction: column; gap: 16px;')}>
           <div style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 20px; padding: 24px;')}>
@@ -110,11 +105,22 @@ export default function AddCategory() {
             <div style={css('display: flex; flex-direction: column; gap: 14px; margin-top: 18px;')}>
               <div>
                 <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Category name (English)</div>
-                <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Frozen foods" style={css('width: 100%; padding: 15px 16px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 16px; font-weight: 700;')} />
+                <input
+                  placeholder="e.g. Frozen foods"
+                  style={css(`width: 100%; padding: 15px 16px; border: 1px solid ${errors.nameEn ? '#E7998F' : '#E4EADF'}; border-radius: 12px; font-size: 16px; font-weight: 700; background: ${errors.nameEn ? '#FFFBFA' : '#FFFFFF'};`)}
+                  {...register('nameEn', { required: 'Category name (English) is required.' })}
+                />
+                {errors.nameEn ? <div className="fc-fade-up" style={css('font-size: 12px; font-weight: 700; color: #C0392B; margin-top: 5px;')}>{errors.nameEn.message}</div> : null}
               </div>
               <div>
                 <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>اسم الفئة (Arabic)</div>
-                <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: مجمدات" dir="rtl" style={css('width: 100%; padding: 15px 16px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 16px; font-weight: 700;')} />
+                <input
+                  dir="rtl"
+                  placeholder="مثال: مجمدات"
+                  style={css(`width: 100%; padding: 15px 16px; border: 1px solid ${errors.nameAr ? '#E7998F' : '#E4EADF'}; border-radius: 12px; font-size: 16px; font-weight: 700; background: ${errors.nameAr ? '#FFFBFA' : '#FFFFFF'};`)}
+                  {...register('nameAr', { required: 'Arabic name is required to publish.' })}
+                />
+                {errors.nameAr ? <div className="fc-fade-up" style={css('font-size: 12px; font-weight: 700; color: #C0392B; margin-top: 5px;')}>{errors.nameAr.message}</div> : null}
               </div>
               <div>
                 <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Sits under</div>
@@ -241,7 +247,7 @@ export default function AddCategory() {
               type="button"
               className="hv-green"
               disabled={saving}
-              onClick={save}
+              onClick={handleSubmit(save)}
               style={css(`background: ${saving ? '#8FCE6C' : '#47BB1C'}; color: #FFFFFF; border: none; border-radius: 14px; padding: 17px 20px; font-size: 16px; font-weight: 800; cursor: ${saving ? 'default' : 'pointer'};`)}
             >
               {saving ? 'Saving…' : 'Save category'}
