@@ -4,6 +4,7 @@ import { localized } from '../lib/adapt'
 import { api } from '../lib/api'
 import { uploadImage } from '../lib/upload'
 import { useFetch } from '../lib/useFetch'
+import { useLiveReload } from '../lib/useLiveReload'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import StateBlock from '../components/StateBlock'
@@ -21,6 +22,7 @@ export default function Settings() {
   }, [])
 
   const { data, loading, error, reload } = useFetch(fetchAll, [])
+  useLiveReload(['payment-method.changed'], reload)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [locating, setLocating] = useState(false)
   const latRef = useRef(null)

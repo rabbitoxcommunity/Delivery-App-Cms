@@ -4,6 +4,7 @@ import { css } from '../lib/css'
 import { localized } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useLiveReload } from '../lib/useLiveReload'
 import { useToast } from '../lib/toast'
 import StateBlock from '../components/StateBlock'
 
@@ -27,6 +28,7 @@ export default function Categories() {
   }, [])
 
   const { data, loading, error, reload } = useFetch(fetchAll, [])
+  useLiveReload(['category.changed'], reload)
 
   const toggleVisible = async (cat) => {
     try {

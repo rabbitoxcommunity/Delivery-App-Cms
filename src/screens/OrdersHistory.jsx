@@ -4,6 +4,7 @@ import { CAR, VAN, chip, money, pillBtn, typeChip } from '../lib/design'
 import { mapHistoryRow } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useLiveReload } from '../lib/useLiveReload'
 import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
@@ -38,6 +39,10 @@ export default function OrdersHistory() {
   }, [cursor, status, fulfillment, q])
 
   const { data, loading, error, reload } = useFetch(fetchPage, [fetchPage])
+  useLiveReload(
+    ['order.created', 'order.status', 'order.assigned', 'order.lines', 'order.arrived'],
+    reload,
+  )
 
   const rows = (data?.items || []).map(mapHistoryRow)
 

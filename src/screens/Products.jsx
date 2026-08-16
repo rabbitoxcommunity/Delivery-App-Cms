@@ -5,6 +5,7 @@ import { PROPS, stockPill } from '../lib/design'
 import { fromFils, localized, toFils } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useLiveReload } from '../lib/useLiveReload'
 import { useToast } from '../lib/toast'
 import StateBlock from '../components/StateBlock'
 
@@ -41,6 +42,7 @@ export default function Products() {
   }, [page, q])
 
   const { data, loading, error, reload } = useFetch(fetchProducts, [fetchProducts])
+  useLiveReload(['product.changed', 'stock.changed'], reload)
 
   const search = (value) => {
     setQ(value)

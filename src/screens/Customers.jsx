@@ -4,6 +4,7 @@ import { GREEN } from '../lib/design'
 import { formatDateTime, toFils } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useLiveReload } from '../lib/useLiveReload'
 import { useToast } from '../lib/toast'
 import { useDialogs } from '../lib/dialogs'
 import StateBlock from '../components/StateBlock'
@@ -24,6 +25,7 @@ export default function Customers() {
   }, [page, q])
 
   const { data, loading, error, reload } = useFetch(fetchCustomers, [fetchCustomers])
+  useLiveReload(['credit.changed'], reload)
 
   const search = (value) => {
     setQ(value)

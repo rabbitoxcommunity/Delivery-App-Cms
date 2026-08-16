@@ -5,6 +5,7 @@ import { GREEN, money } from '../lib/design'
 import { fromFils, toFils } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useLiveReload } from '../lib/useLiveReload'
 import { useToast } from '../lib/toast'
 import { Field, inputStyle } from '../components/FormField'
 import { recordCreditPayment } from '../lib/ordersData'
@@ -20,6 +21,7 @@ function initialsOf(name) {
 
 export default function Credit() {
   const { data, loading, error, reload } = useFetch(() => api.get('/admin/credit'), [])
+  useLiveReload(['credit.changed'], reload)
   const [settling, setSettling] = useState(null)
 
   const accounts = data?.accounts || []

@@ -55,7 +55,7 @@ export function useLiveOrders({ tenantId, accessToken }) {
     // there is no state change left to diff against; and the initial fetch then
     // can't chime for orders that were already sitting there when the screen
     // opened — only genuinely new events make a sound.
-    connectQueueSocket(tenantId, accessToken, {
+    const handlers = {
       'order.created': () => {
         playAlert('order')
         load()
@@ -67,8 +67,11 @@ export function useLiveOrders({ tenantId, accessToken }) {
       'order.assigned': onEvent,
       'order.lines': onEvent,
       'order.arrived': onEvent,
-    })
-    return () => disconnectQueueSocket()
+    }
+    // Orders placed while the socket was down never fired an event here, so
+    // the queue is re-read on reconnect rather than left silently stale.
+    connectQueueSocket(tenantId, accessToken, handlers, load)
+    return () => disconnectQueueSocket(handlers, load)
   }, [tenantId, accessToken, load])
 
   const advance = useCallback(

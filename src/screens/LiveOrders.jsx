@@ -5,10 +5,20 @@ import { decorate } from '../lib/orders'
 import { useSoundAlerts } from '../lib/sound'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useLiveReload } from '../lib/useLiveReload'
 import StateBlock from '../components/StateBlock'
 
+/**
+ * These counters come from a separate analytics endpoint, not from the order
+ * rows below them, so they need their own socket subscription — without it
+ * they were fetched once on mount and then sat frozen while the live queue
+ * underneath updated, which reads as the numbers being wrong.
+ */
+const ORDER_EVENTS = ['order.created', 'order.status', 'order.assigned', 'order.arrived', 'order.lines']
+
 function useTodayStats() {
-  const { data } = useFetch(() => api.get('/admin/analytics/today'), [])
+  const { data, reload } = useFetch(() => api.get('/admin/analytics/today'), [])
+  useLiveReload(ORDER_EVENTS, reload)
   const byStatus = data?.byStatus || {}
   return {
     waitingToPack: (byStatus.placed || 0) + (byStatus.packed || 0),

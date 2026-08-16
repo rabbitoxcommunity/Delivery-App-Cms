@@ -4,6 +4,7 @@ import { GREEN } from '../lib/design'
 import { localized } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
+import { useLiveReload } from '../lib/useLiveReload'
 import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
@@ -55,6 +56,7 @@ export default function QuickStock() {
   }, [q])
 
   const { data, loading, error, reload } = useFetch(q.trim() ? fetchSearch : fetchDefault, [q])
+  useLiveReload(['stock.changed', 'product.changed'], reload)
 
   const rows = data || []
   const outCount = rows.filter((r) => r.stock === 'out').length
