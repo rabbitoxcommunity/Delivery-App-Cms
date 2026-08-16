@@ -17,6 +17,7 @@ import AddCategory from './screens/AddCategory'
 import AddProduct from './screens/AddProduct'
 import Categories from './screens/Categories'
 import Credit from './screens/Credit'
+import Customers from './screens/Customers'
 import Insights from './screens/Insights'
 import LiveOrders from './screens/LiveOrders'
 import OrdersHistory from './screens/OrdersHistory'
@@ -183,6 +184,11 @@ const router = createBrowserRouter(
               path: 'stock',
               element: <QuickStock />,
               handle: { title: 'Quick Stock Update', subtitle: 'Flip availability in seconds — customers see it instantly' },
+            },
+            {
+              path: 'customers',
+              element: <Customers />,
+              handle: { title: 'Customers', subtitle: 'Everyone who has signed up to order from you' },
             },
             {
               path: 'credit',

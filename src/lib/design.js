@@ -60,6 +60,7 @@ export const NAV = [
   ['/products', 'Products', 'M4 8l8-4 8 4v8l-8 4-8-4V8ZM4 8l8 4 8-4M12 12v8'],
   ['/categories', 'Categories', 'M4 5h7v7H4zM13 5h7v7h-7zM4 14h7v5H4zM13 14h7v5h-7z'],
   ['/stock', 'Quick Stock', 'M4 5h16v14H4zM8 12l3 3 5-5'],
+  ['/customers', 'Customers', 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5M17 8a3 3 0 1 0 0-6M22 20c0-2.8-1.8-4.6-4.5-5.3'],
   ['/credit', 'Credit', 'M3 7h18v10H3zM15 12h3'],
   ['/orders', 'Orders', 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01'],
   ['/staff', 'Delivery Staff', 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21c0-4 3.6-6 8-6s8 2 8 6'],
