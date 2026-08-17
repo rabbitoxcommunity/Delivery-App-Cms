@@ -9,6 +9,7 @@ import { useLiveReload } from '../lib/useLiveReload'
 import { useToast } from '../lib/toast'
 import { useDialogs } from '../lib/dialogs'
 import ImportExcelModal from '../components/ImportExcelModal'
+import Select from '../components/Select'
 import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
@@ -27,6 +28,11 @@ export default function Products() {
   const [open, setOpen] = useState({})
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
+  // 'none' is a real backend value meaning "categoryId is null", not a UI-only
+  // sentinel — see adminListProducts.
+  const [category, setCategory] = useState('')
+  const [stock, setStock] = useState('')
+  const [status, setStatus] = useState('')
   const limit = 20
 
   const onToggle = (id) => setOpen((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -36,14 +42,17 @@ export default function Products() {
   const fetchProducts = useCallback(async () => {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (q.trim()) params.set('q', q.trim())
+    if (category) params.set('category', category)
+    if (stock) params.set('stock', stock)
+    if (status) params.set('status', status)
     const [list, categories, needsFixing] = await Promise.all([
       api.get(`/admin/products?${params.toString()}`),
       api.get('/admin/categories'),
       api.get('/admin/products/needs-fixing?limit=1'),
     ])
-    const catById = Object.fromEntries(categories.map((c) => [c.id, localized(c.name)]))
-    return { ...list, catById, needsFixingTotal: needsFixing.total }
-  }, [page, q])
+    const catById = Object.fromEntries(categories.items.map((c) => [c.id, localized(c.name)]))
+    return { ...list, catById, categoryList: categories.items, needsFixingTotal: needsFixing.total }
+  }, [page, q, category, stock, status])
 
   const { data, loading, error, reload } = useFetch(fetchProducts, [fetchProducts])
   useLiveReload(['product.changed', 'stock.changed'], reload)
@@ -52,6 +61,21 @@ export default function Products() {
     setQ(value)
     setPage(1)
   }
+
+  // Any filter change invalidates the current page number — page 7 of an
+  // unfiltered list is usually past the end of a filtered one.
+  const setFilter = (setter) => (value) => {
+    setter(value)
+    setPage(1)
+  }
+  const clearFilters = () => {
+    setCategory('')
+    setStock('')
+    setStatus('')
+    setQ('')
+    setPage(1)
+  }
+  const activeFilters = [category, stock, status].filter(Boolean).length
 
   const saveField = async (product, patch) => {
     try {
@@ -139,7 +163,10 @@ export default function Products() {
             <path d={SEARCH_ICON} />
           </svg>
           <input
-            placeholder={`Search ${total.toLocaleString()} products by name, barcode or Arabic name`}
+            // No count here: `total` is the FILTERED count, so it read "Search 58
+            // products" while a filter was on. The live count lives in the filter
+            // bar's "N matching" instead.
+            placeholder="Search products by name, barcode or Arabic name"
             value={q}
             onChange={(e) => search(e.target.value)}
             style={css('width: 100%; padding: 15px 16px 15px 44px; border: 1px solid #E4EADF; border-radius: 14px; background: #FFFFFF; font-size: 14.5px; font-weight: 600;')}
@@ -160,9 +187,17 @@ export default function Products() {
         {data?.needsFixingTotal > 0 ? (
           <button
             className="hv-soft"
-            onClick={() => search('')}
-            title="Products without a category — open a product to assign one"
-            style={css('display: flex; align-items: center; gap: 9px; background: #FFFFFF; color: #37413A; border: 1px solid #E4EADF; border-radius: 14px; padding: 15px 20px; font-size: 14.5px; font-weight: 800; cursor: pointer;')}
+            onClick={() => {
+              // Used to call search('') — which only cleared the box and showed
+              // everything. Now it actually filters to the uncategorised rows.
+              setQ('')
+              setStock('')
+              setStatus('')
+              setCategory(category === 'none' ? '' : 'none')
+              setPage(1)
+            }}
+            title="Show only products without a category"
+            style={css(`display: flex; align-items: center; gap: 9px; background: ${category === 'none' ? '#FFF6E2' : '#FFFFFF'}; color: #37413A; border: 1px solid ${category === 'none' ? '#F2D18A' : '#E4EADF'}; border-radius: 14px; padding: 15px 20px; font-size: 14.5px; font-weight: 800; cursor: pointer;`)}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
             Needs fixing
@@ -171,8 +206,79 @@ export default function Products() {
         ) : null}
       </div>
 
+      <div className="fc-toolbar" style={css('display: flex; align-items: center; gap: 10px; flex-wrap: wrap;')}>
+        <div style={css('min-width: 240px;')}>
+          <Select
+            variant="pill"
+            ariaLabel="Filter by category"
+            value={category}
+            onChange={setFilter(setCategory)}
+            placeholder="All categories"
+            options={[
+              { value: '', label: 'All categories' },
+              { value: 'none', label: `No category (${data?.needsFixingTotal ?? 0})` },
+              ...(data?.categoryList || []).map((c) => ({
+                value: c.id,
+                label: `${localized(c.name)} (${c.productCount})`,
+              })),
+            ]}
+          />
+        </div>
+
+        <div style={css('min-width: 150px;')}>
+          <Select
+            variant="pill"
+            ariaLabel="Filter by stock"
+            value={stock}
+            onChange={setFilter(setStock)}
+            placeholder="Any stock"
+            options={[
+              { value: '', label: 'Any stock' },
+              { value: 'available', label: 'Available' },
+              { value: 'low', label: 'Low stock' },
+              { value: 'out', label: 'Out of stock' },
+            ]}
+          />
+        </div>
+
+        <div style={css('min-width: 150px;')}>
+          <Select
+            variant="pill"
+            ariaLabel="Filter by status"
+            value={status}
+            onChange={setFilter(setStatus)}
+            placeholder="Any status"
+            options={[
+              { value: '', label: 'Any status' },
+              { value: 'published', label: 'Published' },
+              { value: 'draft', label: 'Draft' },
+            ]}
+          />
+        </div>
+
+        {activeFilters > 0 || q ? (
+          <button
+            onClick={clearFilters}
+            style={css('background: transparent; border: none; padding: 12px 6px; font-size: 13.5px; font-weight: 800; color: #7B857F; cursor: pointer; text-decoration: underline;')}
+          >
+            Clear {activeFilters > 0 ? `${activeFilters} filter${activeFilters > 1 ? 's' : ''}` : 'search'}
+          </button>
+        ) : null}
+
+        <div style={css('flex: 1;')} />
+        <div style={css('font-size: 13.5px; font-weight: 700; color: #7B857F;')}>
+          {total.toLocaleString()} matching
+        </div>
+      </div>
+
       <div className="fc-tbl" style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 18px; overflow-x: auto;')}>
-        <StateBlock loading={loading} error={error} onRetry={reload} empty={!loading && !error && rows.length === 0} emptyText="No products match this search.">
+        <StateBlock
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          empty={!loading && !error && rows.length === 0}
+          emptyText={activeFilters > 0 || q ? 'No products match this search and filters.' : 'No products yet.'}
+        >
           <div className="fc-thead" style={css('display: grid; grid-template-columns: 64px minmax(240px, 2.1fr) 1fr 130px 150px 132px; gap: 14px; padding: 13px 20px; min-width: 1036px; background: #FAFBF9; font-size: 12px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px;')}>
             <div>Photo</div><div>Name (EN / AR)</div><div>Category</div><div>Price</div><div>Stock</div><div />
           </div>

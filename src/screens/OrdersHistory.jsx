@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react'
 import { css } from '../lib/css'
-import { CAR, VAN, chip, money, pillBtn, typeChip } from '../lib/design'
+import { CAR, VAN, chip, money, typeChip } from '../lib/design'
 import { mapHistoryRow } from '../lib/adapt'
 import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
 import { useLiveReload } from '../lib/useLiveReload'
+import Select from '../components/Select'
 import StateBlock from '../components/StateBlock'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
@@ -80,16 +81,26 @@ export default function OrdersHistory() {
             style={css('width: 100%; padding: 15px 16px 15px 44px; border: 1px solid #E4EADF; border-radius: 14px; background: #FFFFFF; font-size: 14.5px; font-weight: 600;')}
           />
         </div>
-        <select value={fulfillment} onChange={(e) => applyFilter(setFulfillment)(e.target.value)} style={css(pillBtn(!!fulfillment))}>
-          {FULFILLMENT_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
-        <select value={status} onChange={(e) => applyFilter(setStatus)(e.target.value)} style={css(pillBtn(!!status))}>
-          {STATUS_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
+        <div style={css('min-width: 176px;')}>
+          <Select
+            variant="pill"
+            ariaLabel="Filter by fulfillment"
+            value={fulfillment}
+            onChange={applyFilter(setFulfillment)}
+            placeholder="All fulfillment"
+            options={FULFILLMENT_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+          />
+        </div>
+        <div style={css('min-width: 168px;')}>
+          <Select
+            variant="pill"
+            ariaLabel="Filter by status"
+            value={status}
+            onChange={applyFilter(setStatus)}
+            placeholder="Any status"
+            options={STATUS_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+          />
+        </div>
       </div>
 
       <div className="fc-tbl" style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 18px; overflow-x: auto;')}>

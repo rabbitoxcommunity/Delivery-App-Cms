@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { css } from '../lib/css'
 import { chip } from '../lib/design'
 import { STATUS_TO_LABEL } from '../lib/adapt'
@@ -9,6 +9,7 @@ import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import { Field, inputStyle } from '../components/FormField'
 import StateBlock from '../components/StateBlock'
+import Select from '../components/Select'
 
 const AVAIL_LABEL = { available: 'Available', on_delivery: 'On delivery', off_shift: 'Off shift' }
 
@@ -125,7 +126,7 @@ export default function Staff() {
 
 function AddDriverModal({ onClose, onSaved }) {
   const toast = useToast()
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     defaultValues: { name: '', phone: '', plate: '', vehicleType: 'bike', password: '' },
   })
 
@@ -159,11 +160,28 @@ function AddDriverModal({ onClose, onSaved }) {
         </Field>
 
         <div style={css('display: flex; gap: 8px;')}>
-          <select style={{ ...inputStyle(), flex: 1, background: '#FFFFFF' }} {...register('vehicleType')}>
-            <option value="bike">Bike</option>
-            <option value="van">Van</option>
-            <option value="car">Car</option>
-          </select>
+          {/* Controller, not register: react-select renders a div, so RHF cannot
+              read a value off it via a ref the way it does for a native input. */}
+          <div style={css('flex: 1;')}>
+            <Controller
+              name="vehicleType"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  ariaLabel="Vehicle type"
+                  isSearchable={false}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Vehicle"
+                  options={[
+                    { value: 'bike', label: 'Bike' },
+                    { value: 'van', label: 'Van' },
+                    { value: 'car', label: 'Car' },
+                  ]}
+                />
+              )}
+            />
+          </div>
           <input style={{ ...inputStyle(), flex: 1 }} placeholder="Plate (optional)" {...register('plate')} />
         </div>
 

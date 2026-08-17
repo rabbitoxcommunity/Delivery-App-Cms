@@ -7,10 +7,18 @@ import { api } from '../lib/api'
 import { uploadImage } from '../lib/upload'
 import { useFetch } from '../lib/useFetch'
 import { useToast } from '../lib/toast'
+import Select from '../components/Select'
 
 const ACCENTS = ['#47BB1C', '#E39A0B', '#B3261E']
 const STOCK_TO_STATE = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' }
 const STATE_TO_STOCK = { Available: 'available', 'Low Stock': 'low', 'Out of Stock': 'out' }
+// Pill colours for the variant stock control, keyed by the same display
+// strings the form already stores.
+const STOCK_TONE = {
+  Available: { bg: '#E6F6DE', fg: '#2E7A12' },
+  'Low Stock': { bg: '#FFF6E2', fg: '#7A5205' },
+  'Out of Stock': { bg: '#FFE8E5', fg: '#B3261E' },
+}
 
 let variantKeySeed = 0
 const nextKey = () => `v${variantKeySeed++}`
@@ -24,7 +32,7 @@ export default function AddProduct() {
   const isEditing = Boolean(productId)
   const barcodeRef = useRef(null)
 
-  const { data: categories } = useFetch(() => api.get('/admin/categories'), [])
+  const { data: categories } = useFetch(() => api.get('/admin/categories').then((r) => r.items), [])
   const {
     data: existing,
     loading: loadingExisting,
@@ -201,12 +209,16 @@ export default function AddProduct() {
               </div>
               <div>
                 <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Category</div>
-                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={css('width: 100%; padding: 15px 16px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 700; background: #FFFFFF; color: #14181A;')}>
-                  <option value="">Uncategorised</option>
-                  {(categories || []).map((c) => (
-                    <option key={c.id} value={c.id}>{c.name?.en}</option>
-                  ))}
-                </select>
+                <Select
+                  ariaLabel="Category"
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  placeholder="Uncategorised"
+                  options={[
+                    { value: '', label: 'Uncategorised' },
+                    ...(categories || []).map((c) => ({ value: c.id, label: c.name?.en })),
+                  ]}
+                />
               </div>
               <div>
                 <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Barcode</div>
@@ -283,19 +295,21 @@ export default function AddProduct() {
                     onChange={(e) => updateVariant(v.key, { price: e.target.value })}
                     style={css('width: 92px; flex: 0 0 auto; border: 1px solid #E4EADF; background: #FFFFFF; border-radius: 10px; padding: 11px 12px; font-size: 14.5px; font-weight: 800;')}
                   />
-                  <select
-                    value={v.stock}
-                    onChange={(e) => updateVariant(v.key, { stock: e.target.value })}
-                    style={css(
-                      `flex:0 0 auto;border:none;border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:800;background:${
-                        v.stock === 'Available' ? '#E6F6DE' : v.stock === 'Low Stock' ? '#FFF6E2' : '#FFE8E5'
-                      };color:${v.stock === 'Available' ? '#2E7A12' : v.stock === 'Low Stock' ? '#7A5205' : '#B3261E'};`,
-                    )}
-                  >
-                    <option>Available</option>
-                    <option>Low Stock</option>
-                    <option>Out of Stock</option>
-                  </select>
+                  <div style={css('flex: 0 0 auto; width: 150px;')}>
+                    <Select
+                      variant="tone"
+                      ariaLabel="Variant stock"
+                      isSearchable={false}
+                      value={v.stock}
+                      onChange={(next) => updateVariant(v.key, { stock: next })}
+                      tone={STOCK_TONE[v.stock] || STOCK_TONE.Available}
+                      options={[
+                        { value: 'Available', label: 'Available' },
+                        { value: 'Low Stock', label: 'Low Stock' },
+                        { value: 'Out of Stock', label: 'Out of Stock' },
+                      ]}
+                    />
+                  </div>
                   <button type="button" onClick={() => removeVariant(v.key)} style={css('flex: 0 0 auto; background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 10px; width: 40px; height: 40px; font-size: 15px; font-weight: 800; color: #B3261E; cursor: pointer;')}>✕</button>
                 </div>
               ))}

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { css } from '../lib/css'
 import { GREEN } from '../lib/design'
 import { localized } from '../lib/adapt'
@@ -8,6 +8,7 @@ import { api } from '../lib/api'
 import { uploadImage } from '../lib/upload'
 import { useFetch } from '../lib/useFetch'
 import { useToast } from '../lib/toast'
+import Select from '../components/Select'
 
 const SEARCH_ICON = 'M11 11a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM15 15l5 5'
 
@@ -22,15 +23,37 @@ export default function AddCategory() {
   const navigate = useNavigate()
   const toast = useToast()
   const onBack = () => navigate('/categories')
-  const { data: categories } = useFetch(() => api.get('/admin/categories'), [])
+  const { id: categoryId } = useParams()
+  const isEditing = Boolean(categoryId)
+  const { data: categories } = useFetch(() => api.get('/admin/categories').then((r) => r.items), [])
+  const {
+    data: existing,
+    loading: loadingExisting,
+    error: existingError,
+  } = useFetch(
+    () => (categoryId ? api.get(`/admin/categories/${categoryId}`) : Promise.resolve(null)),
+    [categoryId],
+  )
 
-  const { register, handleSubmit, formState: { errors } } = useForm({ defaultValues: { nameEn: '', nameAr: '' } })
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({ defaultValues: { nameEn: '', nameAr: '' } })
 
   const [parentId, setParentId] = useState('')
   const [icon, setIcon] = useState(CATEGORY_ICONS[0])
   const [imageUrl, setImageUrl] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [visible, setVisible] = useState(true)
+
+  // Prefill once the row arrives. The icon may be one the picker doesn't offer
+  // (import assigns from the full catalogue, e.g. 'basket' or 'bolt'), so it is
+  // kept as-is rather than snapped to the first swatch — saving must not
+  // silently rewrite an icon the owner never touched.
+  useEffect(() => {
+    if (!existing) return
+    reset({ nameEn: existing.name?.en || '', nameAr: existing.name?.ar || '' })
+    setIcon(existing.icon || CATEGORY_ICONS[0])
+    setImageUrl(existing.imageUrl ?? null)
+    setVisible(existing.visible !== false)
+  }, [existing, reset])
   const [productQuery, setProductQuery] = useState('')
   const [productResults, setProductResults] = useState([])
   const [selectedProducts, setSelectedProducts] = useState([])
@@ -63,12 +86,28 @@ export default function AddCategory() {
   const save = async (data) => {
     setSaving(true)
     try {
-      let categoryId
+      if (isEditing) {
+        // slug is deliberately NOT resent: it is derived from the English name
+        // on create, but renaming a live category must not silently change the
+        // identifier other records and links resolve against.
+        await api.patch(`/admin/categories/${categoryId}`, {
+          name: { en: data.nameEn, ar: data.nameAr },
+          icon,
+          imageUrl,
+          visible,
+        })
+        await Promise.all(selectedProducts.map((p) => api.patch(`/admin/products/${p.id}`, { categoryId })))
+        toast.success('Category updated')
+        onBack()
+        return
+      }
+
+      let newCategoryId
       if (parentId) {
         const parent = categories.find((c) => c.id === parentId)
         const subcategories = [...(parent.subcategories || []), { slug: slugify(data.nameEn), name: { en: data.nameEn, ar: data.nameAr } }]
         await api.patch(`/admin/categories/${parentId}`, { subcategories })
-        categoryId = parentId
+        newCategoryId = parentId
       } else {
         const created = await api.post('/admin/categories', {
           slug: slugify(data.nameEn),
@@ -78,9 +117,9 @@ export default function AddCategory() {
           visible,
           status: 'published',
         })
-        categoryId = created.id
+        newCategoryId = created.id
       }
-      await Promise.all(selectedProducts.map((p) => api.patch(`/admin/products/${p.id}`, { categoryId })))
+      await Promise.all(selectedProducts.map((p) => api.patch(`/admin/products/${p.id}`, { categoryId: newCategoryId })))
       toast.success('Category saved')
       onBack()
     } catch (err) {
@@ -97,7 +136,13 @@ export default function AddCategory() {
         Back to categories
       </button>
 
-      <div style={css('display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start;')}>
+      {existingError ? (
+        <div style={css('background: #FFF1EF; border: 1px solid #F3B4AC; border-radius: 16px; padding: 24px; text-align: center; font-size: 14.5px; font-weight: 700; color: #B3261E;')}>
+          {existingError.message || 'Could not load this category.'}
+        </div>
+      ) : null}
+
+      <div style={css(`display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; ${loadingExisting ? 'opacity: .5; pointer-events: none;' : ''}`)}>
         <div style={css('display: flex; flex-direction: column; gap: 16px;')}>
           <div style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 20px; padding: 24px;')}>
             <div style={css('font-size: 17px; font-weight: 800;')}>Category details</div>
@@ -122,20 +167,30 @@ export default function AddCategory() {
                 />
                 {errors.nameAr ? <div className="fc-fade-up" style={css('font-size: 12px; font-weight: 700; color: #C0392B; margin-top: 5px;')}>{errors.nameAr.message}</div> : null}
               </div>
-              <div>
-                <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Sits under</div>
-                <select value={parentId} onChange={(e) => setParentId(e.target.value)} style={css('width: 100%; padding: 15px 16px; border: 1px solid #E4EADF; border-radius: 12px; font-size: 15px; font-weight: 700; background: #FFFFFF; color: #14181A;')}>
-                  <option value="">Top level (shown on home screen)</option>
-                  {(categories || []).map((c) => (
-                    <option key={c.id} value={c.id}>{localized(c.name)}</option>
-                  ))}
-                </select>
-                {parentId ? (
-                  <div style={css('font-size: 12.5px; color: #7B857F; font-weight: 600; margin-top: 6px;')}>
-                    Saved as a subcategory (filter chip) under this category — icon and tile image only apply to top-level categories.
-                  </div>
-                ) : null}
-              </div>
+              {/* Hidden when editing: a subcategory is an embedded document on its
+                  parent, not a Category row of its own, so "move under a parent"
+                  is a different operation than a field edit — offering it here
+                  would imply a conversion the API cannot do. */}
+              {!isEditing ? (
+                <div>
+                  <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Sits under</div>
+                  <Select
+                    ariaLabel="Sits under"
+                    value={parentId}
+                    onChange={setParentId}
+                    placeholder="Top level (shown on home screen)"
+                    options={[
+                      { value: '', label: 'Top level (shown on home screen)' },
+                      ...(categories || []).map((c) => ({ value: c.id, label: localized(c.name) })),
+                    ]}
+                  />
+                  {parentId ? (
+                    <div style={css('font-size: 12.5px; color: #7B857F; font-weight: 600; margin-top: 6px;')}>
+                      Saved as a subcategory (filter chip) under this category — icon and tile image only apply to top-level categories.
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               {!parentId ? (
                 <div>
                   <div style={css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')}>Icon</div>
@@ -250,7 +305,7 @@ export default function AddCategory() {
               onClick={handleSubmit(save)}
               style={css(`background: ${saving ? '#8FCE6C' : '#47BB1C'}; color: #FFFFFF; border: none; border-radius: 14px; padding: 17px 20px; font-size: 16px; font-weight: 800; cursor: ${saving ? 'default' : 'pointer'};`)}
             >
-              {saving ? 'Saving…' : 'Save category'}
+              {saving ? 'Saving…' : isEditing ? 'Save changes' : 'Save category'}
             </button>
             <button type="button" onClick={onBack} style={css('background: transparent; color: #7B857F; border: none; padding: 10px; font-size: 14.5px; font-weight: 800; cursor: pointer;')}>Cancel</button>
           </div>

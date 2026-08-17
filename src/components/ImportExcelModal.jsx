@@ -3,6 +3,7 @@ import { css } from '../lib/css'
 import { GREEN } from '../lib/design'
 import { api } from '../lib/api'
 import { useToast } from '../lib/toast'
+import Select from './Select'
 
 /**
  * §17 Excel import — the five server steps behind one wizard:
@@ -51,7 +52,6 @@ function guessColumn(headers, field) {
 }
 
 const label = css('font-size: 12.5px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;')
-const select = css('width: 100%; padding: 11px 12px; border: 1px solid #E4EADF; border-radius: 10px; font-size: 14px; font-weight: 700; background: #FFFFFF; color: #14181A;')
 
 export default function ImportExcelModal({ onClose, onImported }) {
   const toast = useToast()
@@ -216,16 +216,16 @@ export default function ImportExcelModal({ onClose, onImported }) {
                       {text}
                       {required ? <span style={css('color: #B3261E;')}> *</span> : null}
                     </div>
-                    <select
+                    <Select
+                      ariaLabel={`Column for ${text}`}
                       value={mapping[field] || ''}
-                      onChange={(e) => setMapping((m) => ({ ...m, [field]: e.target.value }))}
-                      style={select}
-                    >
-                      <option value="">— not mapped —</option>
-                      {(batch?.headers || []).map((h) => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
+                      onChange={(next) => setMapping((m) => ({ ...m, [field]: next }))}
+                      placeholder="— not mapped —"
+                      options={[
+                        { value: '', label: '— not mapped —' },
+                        ...(batch?.headers || []).map((h) => ({ value: h, label: h })),
+                      ]}
+                    />
                   </div>
                 )
               })}

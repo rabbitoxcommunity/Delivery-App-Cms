@@ -181,6 +181,11 @@ const router = createBrowserRouter(
               handle: { title: 'Add Category', subtitle: 'Categories are the first thing customers see in the app' },
             },
             {
+              path: 'categories/:id/edit',
+              element: <AddCategory />,
+              handle: { title: 'Edit Category', subtitle: 'Changes are live as soon as you save' },
+            },
+            {
               path: 'stock',
               element: <QuickStock />,
               handle: { title: 'Quick Stock Update', subtitle: 'Flip availability in seconds — customers see it instantly' },
