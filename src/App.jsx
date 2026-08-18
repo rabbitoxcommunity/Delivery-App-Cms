@@ -3,6 +3,7 @@ import { Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation, use
 
 import { css } from './lib/css'
 import { useAuth } from './lib/auth'
+import { useDialogs } from './lib/dialogs'
 import { useLiveOrders } from './lib/ordersData'
 import { api, decodeTenantId, getAccessToken } from './lib/api'
 import { useFetch } from './lib/useFetch'
@@ -59,7 +60,25 @@ function LoginRoute() {
 /** Sidebar + Header + the live-orders data every nested route/drawer shares, via Outlet context. */
 function Shell() {
   const { user, signOut } = useAuth()
+  const { confirm } = useDialogs()
   const location = useLocation()
+
+  /**
+   * Signing out is one click away from every screen in the sidebar, and it
+   * drops the session for whoever is standing at the counter — on a shared
+   * back-office terminal that is someone else's shift, not just a navigation.
+   * Cheap to confirm, annoying to undo.
+   */
+  const confirmSignOut = async () => {
+    const ok = await confirm({
+      title: 'Sign out?',
+      body: 'You will need your login key, email and password to get back in.',
+      tone: 'danger',
+      confirmLabel: 'Sign out',
+      cancelLabel: 'Stay signed in',
+    })
+    if (ok) signOut()
+  }
   const [selected, setSelected] = useState(null)
   const [navOpen, setNavOpen] = useState(false)
 
@@ -96,7 +115,7 @@ function Shell() {
   return (
     <>
       <div className="fc-shell" style={css('display: grid; grid-template-columns: 252px 1fr; min-height: 100vh; align-items: stretch;')}>
-        <Sidebar onNavigate={() => setNavOpen(false)} user={user} onSignOut={signOut} badges={badges} />
+        <Sidebar onNavigate={() => setNavOpen(false)} user={user} onSignOut={confirmSignOut} badges={badges} />
 
         <main style={css('min-width: 0; display: flex; flex-direction: column;')}>
           <Header onOpenNav={() => setNavOpen(true)} />
