@@ -22,6 +22,8 @@ import Insights from './screens/Insights'
 import LiveOrders from './screens/LiveOrders'
 import OrdersHistory from './screens/OrdersHistory'
 import Products from './screens/Products'
+import AddPromo from './screens/AddPromo'
+import Promos from './screens/Promos'
 import QuickStock from './screens/QuickStock'
 import Settings from './screens/Settings'
 import Staff from './screens/Staff'
@@ -184,6 +186,21 @@ const router = createBrowserRouter(
               path: 'categories/:id/edit',
               element: <AddCategory />,
               handle: { title: 'Edit Category', subtitle: 'Changes are live as soon as you save' },
+            },
+            {
+              path: 'promos',
+              element: <Promos />,
+              handle: { title: 'Promo Codes', subtitle: 'Discount codes customers type at checkout' },
+            },
+            {
+              path: 'promos/new',
+              element: <AddPromo />,
+              handle: { title: 'Add Promo Code', subtitle: 'It works at checkout as soon as you create it' },
+            },
+            {
+              path: 'promos/:id/edit',
+              element: <AddPromo />,
+              handle: { title: 'Edit Promo Code', subtitle: 'Changes apply to every checkout from now on' },
             },
             {
               path: 'stock',

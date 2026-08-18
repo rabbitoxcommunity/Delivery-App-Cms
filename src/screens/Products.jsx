@@ -17,8 +17,8 @@ const STOCK_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Sto
 
 const THUMB = 'width:46px;height:46px;border-radius:10px;display:grid;place-items:center;background:repeating-linear-gradient(135deg,#F4F6F2 0 6px,#EDEFEB 6px 12px);overflow:hidden;'
 const VAR_THUMB = 'width:38px;height:38px;border-radius:9px;margin-left:16px;display:grid;place-items:center;background:repeating-linear-gradient(135deg,#F4F6F2 0 6px,#EDEFEB 6px 12px);'
-const ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1fr 130px 150px 132px;gap:14px;align-items:center;padding:13px 20px;min-width:1036px;border-top:1px solid #F2F4F0;'
-const VAR_ROW = 'display:grid;grid-template-columns:64px minmax(240px, 2.1fr) 1fr 130px 150px 132px;gap:14px;align-items:center;padding:11px 20px 11px 32px;min-width:1036px;border-top:1px solid #F6F8F4;background:#FCFDFB;'
+const ROW = 'display:grid;grid-template-columns:64px minmax(220px, 2.1fr) 1fr 120px 140px 176px;gap:14px;align-items:center;padding:13px 20px;min-width:1076px;border-top:1px solid #F2F4F0;'
+const VAR_ROW = 'display:grid;grid-template-columns:64px minmax(220px, 2.1fr) 1fr 120px 140px 176px;gap:14px;align-items:center;padding:11px 20px 11px 32px;min-width:1076px;border-top:1px solid #F6F8F4;background:#FCFDFB;'
 
 export default function Products() {
   const navigate = useNavigate()
@@ -45,13 +45,21 @@ export default function Products() {
     if (category) params.set('category', category)
     if (stock) params.set('stock', stock)
     if (status) params.set('status', status)
-    const [list, categories, needsFixing] = await Promise.all([
+    const [list, categories, needsFixing, merch] = await Promise.all([
       api.get(`/admin/products?${params.toString()}`),
       api.get('/admin/categories'),
       api.get('/admin/products/needs-fixing?limit=1'),
+      api.get('/admin/merchandising'),
     ])
     const catById = Object.fromEntries(categories.items.map((c) => [c.id, localized(c.name)]))
-    return { ...list, catById, categoryList: categories.items, needsFixingTotal: needsFixing.total }
+    return {
+      ...list,
+      catById,
+      categoryList: categories.items,
+      needsFixingTotal: needsFixing.total,
+      popular: merch.popular,
+      popularIds: merch.popularProductIds,
+    }
   }, [page, q, category, stock, status])
 
   const { data, loading, error, reload } = useFetch(fetchProducts, [fetchProducts])
@@ -76,6 +84,35 @@ export default function Products() {
     setPage(1)
   }
   const activeFilters = [category, stock, status].filter(Boolean).length
+
+  // The whole curated list is sent on every change: the API takes the full
+  // array, and its ORDER is what /home serves to the app.
+  const savePopular = async (ids, message) => {
+    try {
+      await api.put('/admin/merchandising', { popularProductIds: ids })
+      reload()
+      if (message) toast.success(message)
+    } catch (e) {
+      toast.error(e.message || 'Could not update the popular list.')
+    }
+  }
+
+  const togglePopular = (product, name) => {
+    const ids = data?.popularIds || []
+    const on = ids.includes(product.id)
+    savePopular(
+      on ? ids.filter((id) => id !== product.id) : [...ids, product.id],
+      on ? `"${name}" removed from Popular` : `"${name}" added to Popular`,
+    )
+  }
+
+  const movePopular = (index, delta) => {
+    const ids = [...(data?.popularIds || [])]
+    const to = index + delta
+    if (to < 0 || to >= ids.length) return
+    ;[ids[index], ids[to]] = [ids[to], ids[index]]
+    savePopular(ids)
+  }
 
   const saveField = async (product, patch) => {
     try {
@@ -104,6 +141,9 @@ export default function Products() {
       toast.error(e.message || 'Could not delete this product.')
     }
   }
+
+  const popularIds = data?.popularIds || []
+  const isPopular = (id) => popularIds.includes(id)
 
   const products = data?.items || []
   const catById = data?.catById || {}
@@ -271,6 +311,70 @@ export default function Products() {
         </div>
       </div>
 
+      {/* Curated "Popular this week". When empty the app falls back to the
+          order-derived ranking (jobs/popularity.ts), so an empty list is a valid
+          state rather than a broken one — say so instead of showing nothing. */}
+      <div style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 16px; padding: 16px 20px;')}>
+        <div style={css('display: flex; align-items: center; gap: 12px; flex-wrap: wrap;')}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="#E39A0B" stroke="#E39A0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z" />
+          </svg>
+          <span style={css('font-size: 14.5px; font-weight: 800; color: #37413A;')}>Popular this week</span>
+          <span style={css('font-size: 13px; font-weight: 700; color: #7B857F; flex: 1;')}>
+            {(data?.popular || []).length === 0
+              ? 'Nothing featured — the app is ranking by units sold in the last 7 days. Star a product to override that.'
+              : 'Shown on the app home screen in this order, overriding sales ranking.'}
+          </span>
+          {(data?.popular || []).length > 0 ? (
+            <button
+              onClick={() => savePopular([], 'Popular list cleared — back to sales ranking')}
+              style={css('background: transparent; border: none; padding: 4px 2px; font-size: 13px; font-weight: 800; color: #7B857F; cursor: pointer; text-decoration: underline;')}
+            >
+              Clear all
+            </button>
+          ) : null}
+        </div>
+
+        {(data?.popular || []).length > 0 ? (
+          <div style={css('display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px;')}>
+            {(data?.popular || []).map((prod, i) => (
+              <div key={prod.id} style={css('display: flex; align-items: center; gap: 8px; background: #FFF6E2; border: 1px solid #F2D18A; border-radius: 11px; padding: 7px 8px 7px 11px;')}>
+                <span style={css('font-size: 12px; font-weight: 800; color: #B0842A;')}>{i + 1}</span>
+                <span style={css('font-size: 13.5px; font-weight: 800; color: #7A5205; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;')}>
+                  {localized(prod.name)}
+                </span>
+                <button
+                  onClick={() => movePopular(i, -1)}
+                  disabled={i === 0}
+                  title="Move earlier"
+                  aria-label={`Move ${localized(prod.name)} earlier`}
+                  style={css(`background: #FFFFFF; border: 1px solid #F2D18A; border-radius: 7px; padding: 2px 5px; line-height: 1; color: #7A5205; cursor: ${i === 0 ? 'default' : 'pointer'}; opacity: ${i === 0 ? 0.4 : 1};`)}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
+                <button
+                  onClick={() => movePopular(i, 1)}
+                  disabled={i === (data?.popular || []).length - 1}
+                  title="Move later"
+                  aria-label={`Move ${localized(prod.name)} later`}
+                  style={css(`background: #FFFFFF; border: 1px solid #F2D18A; border-radius: 7px; padding: 2px 5px; line-height: 1; color: #7A5205; cursor: ${i === (data?.popular || []).length - 1 ? 'default' : 'pointer'}; opacity: ${i === (data?.popular || []).length - 1 ? 0.4 : 1};`)}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+                <button
+                  onClick={() => togglePopular(prod, localized(prod.name))}
+                  title="Remove from Popular"
+                  aria-label={`Remove ${localized(prod.name)} from Popular`}
+                  style={css('background: transparent; border: none; padding: 2px 4px; font-size: 14px; font-weight: 800; color: #B3261E; cursor: pointer; line-height: 1;')}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
       <div className="fc-tbl" style={css('background: #FFFFFF; border: 1px solid #EAEDE9; border-radius: 18px; overflow-x: auto;')}>
         <StateBlock
           loading={loading}
@@ -279,7 +383,7 @@ export default function Products() {
           empty={!loading && !error && rows.length === 0}
           emptyText={activeFilters > 0 || q ? 'No products match this search and filters.' : 'No products yet.'}
         >
-          <div className="fc-thead" style={css('display: grid; grid-template-columns: 64px minmax(240px, 2.1fr) 1fr 130px 150px 132px; gap: 14px; padding: 13px 20px; min-width: 1036px; background: #FAFBF9; font-size: 12px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px;')}>
+          <div className="fc-thead" style={css('display: grid; grid-template-columns: 64px minmax(220px, 2.1fr) 1fr 120px 140px 176px; gap: 14px; padding: 13px 20px; min-width: 1076px; background: #FAFBF9; font-size: 12px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .5px;')}>
             <div>Photo</div><div>Name (EN / AR)</div><div>Category</div><div>Price</div><div>Stock</div><div />
           </div>
 
@@ -351,6 +455,21 @@ export default function Products() {
               </div>
               <div data-label="Stock"><span style={css(stockPill(p.stock))}>{p.stock}</span></div>
               <div className="fc-act" style={css('display: flex; justify-content: flex-end; gap: 6px;')}>
+                {/* Curation is per parent product — /home returns products, and a
+                    single variant cannot be featured on its own. */}
+                {!p.variant ? (
+                  <button
+                    onClick={() => togglePopular(p.product, p.name)}
+                    title={isPopular(p.product.id) ? 'Remove from Popular this week' : 'Feature in Popular this week'}
+                    aria-label={`${isPopular(p.product.id) ? 'Remove' : 'Add'} ${p.name} ${isPopular(p.product.id) ? 'from' : 'to'} Popular`}
+                    aria-pressed={isPopular(p.product.id)}
+                    style={css(`background: ${isPopular(p.product.id) ? '#FFF6E2' : '#FFFFFF'}; border: 1px solid ${isPopular(p.product.id) ? '#F2D18A' : '#E4EADF'}; border-radius: 10px; padding: 8px 9px; cursor: pointer; display: flex; align-items: center; color: ${isPopular(p.product.id) ? '#E39A0B' : '#9AA39C'};`)}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill={isPopular(p.product.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z" />
+                    </svg>
+                  </button>
+                ) : null}
                 <button
                   className="hv-soft"
                   onClick={() => onEdit(p.product.id)}
@@ -376,7 +495,7 @@ export default function Products() {
             </div>
           ))}
 
-          <div className="fc-tblfoot" style={css('display: flex; align-items: center; gap: 14px; padding: 15px 20px; min-width: 1036px; border-top: 1px solid #EFF1ED; font-size: 13.5px; color: #7B857F; font-weight: 700;')}>
+          <div className="fc-tblfoot" style={css('display: flex; align-items: center; gap: 14px; padding: 15px 20px; min-width: 1076px; border-top: 1px solid #EFF1ED; font-size: 13.5px; color: #7B857F; font-weight: 700;')}>
             Showing {products.length} of {total.toLocaleString()} products
             <div style={css('margin-left: auto; display: flex; gap: 8px;')}>
               <button
