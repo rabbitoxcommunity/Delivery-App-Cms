@@ -4,6 +4,7 @@ import { GREEN } from '../lib/design'
 import { api } from '../lib/api'
 import { useToast } from '../lib/toast'
 import Select from './Select'
+import Portal from './Portal'
 
 /**
  * §17 Excel import — the five server steps behind one wizard:
@@ -170,6 +171,7 @@ export default function ImportExcelModal({ onClose, onImported }) {
   const stats = batch?.stats || {}
 
   return (
+    <Portal>
     <div
       className="fc-backdrop"
       onClick={step === 'importing' ? undefined : onClose}
@@ -306,5 +308,6 @@ export default function ImportExcelModal({ onClose, onImported }) {
         </div>
       </div>
     </div>
+    </Portal>
   )
 }

@@ -7,9 +7,11 @@ import { api } from '../lib/api'
 import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
+import { useDialogs } from '../lib/dialogs'
 import { Field, inputStyle } from '../components/FormField'
 import StateBlock from '../components/StateBlock'
 import Select from '../components/Select'
+import Portal from '../components/Portal'
 
 const AVAIL_LABEL = { available: 'Available', on_delivery: 'On delivery', off_shift: 'Off shift' }
 
@@ -21,7 +23,10 @@ function initialsOf(name) {
 
 export default function Staff() {
   const { hasGrade } = useAuth()
+  const toast = useToast()
+  const dialogs = useDialogs()
   const [adding, setAdding] = useState(false)
+  const [removingId, setRemovingId] = useState(null)
 
   const fetchAll = useCallback(async () => {
     const [riders, orders] = await Promise.all([
@@ -32,6 +37,36 @@ export default function Staff() {
   }, [])
 
   const { data, loading, error, reload } = useFetch(fetchAll, [])
+
+  /**
+   * DELETE /admin/staff/:id is a HARD delete — the row is gone, not flagged.
+   * So it goes behind a danger confirm that names the person, and the
+   * server's 409 messages are surfaced verbatim: it refuses to remove the
+   * last owner, or a rider still holding orders, and the reason is the
+   * useful part.
+   */
+  const removeDriver = async (driver) => {
+    const ok = await dialogs.confirm({
+      tone: 'danger',
+      title: `Remove ${driver.name}?`,
+      body:
+        'This permanently deletes the account and signs them out of the delivery app. ' +
+        'It cannot be undone. Completed deliveries stay in your records.',
+      confirmLabel: 'Remove driver',
+    })
+    if (!ok) return
+
+    setRemovingId(driver.id)
+    try {
+      await api.delete(`/admin/staff/${driver.id}`)
+      toast.success(`${driver.name} removed`)
+      reload()
+    } catch (e) {
+      toast.error(e.message || 'Could not remove this driver.')
+    } finally {
+      setRemovingId(null)
+    }
+  }
 
   const riders = data?.riders || []
   const orders = data?.orders || []
@@ -114,6 +149,23 @@ export default function Staff() {
                   ))
                 )}
               </div>
+
+              {hasGrade('owner') ? (
+                <div style={css('display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 14px; border-top: 1px solid #F2F4F0;')}>
+                  <button
+                    onClick={() => removeDriver(d)}
+                    disabled={removingId === d.id}
+                    className="hv-red-lt"
+                    style={css(
+                      `background: #FFFFFF; color: ${removingId === d.id ? '#B9928F' : '#B3261E'}; border: 1px solid #F3B4AC; ` +
+                        `border-radius: 11px; padding: 10px 16px; font-size: 13.5px; font-weight: 800; ` +
+                        `cursor: ${removingId === d.id ? 'default' : 'pointer'};`,
+                    )}
+                  >
+                    {removingId === d.id ? 'Removing…' : 'Remove driver'}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -147,6 +199,7 @@ function AddDriverModal({ onClose, onSaved }) {
   }
 
   return (
+    <Portal>
     <div className="fc-backdrop" onClick={onClose} style={css('position: fixed; inset: 0; background: rgba(15,26,18,.42); display: flex; align-items: center; justify-content: center; z-index: 30;')}>
       <form onSubmit={handleSubmit(save)} onClick={(e) => e.stopPropagation()} className="fc-modal" style={css('background: #FFFFFF; border-radius: 20px; padding: 26px; width: 380px; max-width: 90vw; display: flex; flex-direction: column; gap: 12px;')}>
         <div style={css('font-size: 18px; font-weight: 800;')}>Add delivery driver</div>
@@ -202,5 +255,6 @@ function AddDriverModal({ onClose, onSaved }) {
         </div>
       </form>
     </div>
+    </Portal>
   )
 }

@@ -11,5 +11,5 @@ export default defineConfig({
   // which lands the app on an origin the bucket rejects: every upload then
   // fails preflight while the rest of the app works normally. strictPort makes
   // the collision fail loudly at startup instead.
-  server: { port: 5173, strictPort: true },
+  server: { port: 5210, strictPort: true },
 })

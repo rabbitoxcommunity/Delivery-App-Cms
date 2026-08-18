@@ -99,7 +99,26 @@ export function useLiveOrders({ tenantId, accessToken }) {
     [rows, load],
   )
 
-  return { rows, loading, error, reload: load, advance, cancel }
+  /**
+   * §10 POST /admin/orders/:id/rider — manual assign or reassign, overriding
+   * the automatic workload-based pick.
+   *
+   * Needed because automatic assignment only ever runs when the order is
+   * created: an order placed while every rider was busy or off shift gets
+   * flagged `needsManualAssignment` and then waits for either a rider to come
+   * free or for someone here to place it by hand.
+   */
+  const assignRider = useCallback(
+    async (reference, riderId) => {
+      const row = rows.find((r) => r.id === reference)
+      if (!row) return
+      await api.post(`/admin/orders/${row._id}/rider`, { riderId })
+      await load()
+    },
+    [rows, load],
+  )
+
+  return { rows, loading, error, reload: load, advance, cancel, assignRider }
 }
 
 export async function recordCreditPayment(customerId, amountFils) {
@@ -108,4 +127,9 @@ export async function recordCreditPayment(customerId, amountFils) {
     { amount: amountFils },
     { headers: { 'Idempotency-Key': idempotencyKey() } },
   )
+}
+
+/** Active delivery staff, for the assign-driver picker. */
+export async function fetchDeliveryStaff() {
+  return api.get('/admin/staff?role=deliveryStaff')
 }

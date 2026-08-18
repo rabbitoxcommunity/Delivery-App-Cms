@@ -49,7 +49,11 @@ input:focus { outline: 2px solid #47BB1C; outline-offset: -1px; }
 
 @keyframes fcFadeUp {
   from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  /* `none`, not translateY(0): with fill-mode `both` the element keeps this
+     value forever, and even an identity transform makes it the containing
+     block for `position: fixed` descendants. Modals are portalled out anyway,
+     but this stops the trap being re-set for anything else. */
+  to { opacity: 1; transform: none; }
 }
 .fc-fade-up { animation: fcFadeUp .28s cubic-bezier(.2,.8,.3,1) both; }
 
@@ -80,6 +84,9 @@ input:focus { outline: 2px solid #47BB1C; outline-offset: -1px; }
 .hv-white:hover    { color: #FFFFFF !important; }
 .hv-link:hover     { color: #2E7A12 !important; }
 .hv-input:hover    { border-color: #E4EADF !important; background: #FAFBF9 !important; }
+
+/* Destructive outline button (Remove driver) — tint on hover, not a fill. */
+.hv-red-lt:hover   { background: #FFF1EF !important; }
 
 /* --------------------------------------------------------------------------
    Additive chrome: mobile nav trigger, scrim, install prompt. All hidden at

@@ -25,7 +25,12 @@ export default function Insights() {
     from.setDate(from.getDate() - 29)
     const fromKey = dateKey(from)
     const yesterdayKey = dateKey(new Date(today.getTime() - 86400000))
-    const toKey = yesterdayKey // rollups are computed for days strictly before today
+    // Today INCLUDED. This used to stop at yesterday because rollups were only
+    // ever written for completed days — which meant a shop whose orders were all
+    // from today saw three permanently empty panels next to a working "today"
+    // tile. The analytics endpoints now refresh today's rollup on demand, so the
+    // range can honestly be the last 30 days.
+    const toKey = dateKey(today)
 
     const [todayStats, summary, products, categories, customers] = await Promise.all([
       api.get('/admin/analytics/today'),
@@ -150,7 +155,10 @@ export default function Insights() {
                 <div key={p.productId} style={css('display: grid; grid-template-columns: 34px 1fr 96px; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #F2F4F0;')}>
                   <div style={css(p.rankStyle)}>{p.rank}</div>
                   <div style={css('min-width: 0;')}>
-                    <div style={css('font-size: 14.5px; font-weight: 700;')}>{p.units} sold</div>
+                    <div style={css('font-size: 14.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;')}>
+                      {localized(p.name) || 'Unknown product'}
+                    </div>
+                    <div style={css('font-size: 12.5px; color: #7B857F; font-weight: 700; margin-top: 2px;')}>{p.units} sold</div>
                     <div style={css('height: 6px; border-radius: 3px; background: #F0F2EE; margin-top: 7px; overflow: hidden;')}>
                       <div style={css(p.barStyle)} />
                     </div>
@@ -173,6 +181,9 @@ export default function Insights() {
                 {catRows.map((c) => (
                   <div key={c.categoryId}>
                     <div style={css('display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; font-weight: 700;')}>
+                      <span style={css('min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;')}>
+                        {localized(c.name) || 'Uncategorised'}
+                      </span>
                       <span style={css('margin-left: auto; font-weight: 800;')}>AED {fromFils(c.revenue).toFixed(0)}</span>
                       <span style={css('color: #7B857F; font-weight: 700; width: 42px; text-align: right;')}>{c.share}%</span>
                     </div>

@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { css } from '../lib/css'
 import { FLOWS, GREEN, chip, money } from '../lib/design'
 import { decorate } from '../lib/orders'
 import { fromFils, localized } from '../lib/adapt'
 import { useToast } from '../lib/toast'
 import { useDialogs } from '../lib/dialogs'
+import { fetchDeliveryStaff } from '../lib/ordersData'
 
-export default function OrderDrawer({ order, onClose, onAdvance, onCancel }) {
+export default function OrderDrawer({ order, onClose, onAdvance, onCancel, onAssignRider }) {
   const toast = useToast()
   const { promptText } = useDialogs()
   const [busy, setBusy] = useState(false)
@@ -125,6 +126,10 @@ export default function OrderDrawer({ order, onClose, onAdvance, onCancel }) {
           </div>
         )}
 
+        {sel.type === 'Delivery' && !cancelled ? (
+          <DriverSection order={order} onAssignRider={onAssignRider} />
+        ) : null}
+
         <div>
           <div style={css('font-size: 13px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .6px;')}>
             {sel.items} items
@@ -177,6 +182,129 @@ export default function OrderDrawer({ order, onClose, onAdvance, onCancel }) {
           </div>
         ) : null}
       </div>
+    </div>
+  )
+}
+
+const AVAIL_LABEL = { available: 'Available', on_delivery: 'On delivery', off_shift: 'Off shift' }
+
+/**
+ * Assign or reassign the driver on a delivery order.
+ *
+ * Orders are normally auto-assigned by workload the moment they are placed,
+ * so most of the time this only reports who got it. It matters when that
+ * could not happen — every rider busy or off shift when the order came in —
+ * which the server marks with `assignment.needsManualAssignment`. Those
+ * orders are in nobody's app until they are placed by hand here, so the
+ * warning below is the whole point of the section.
+ *
+ * Off-shift riders are still listed, greyed, rather than hidden: assigning to
+ * one is a legitimate "you are back on, take this" and the server allows it.
+ */
+function DriverSection({ order, onAssignRider }) {
+  const toast = useToast()
+  const [staff, setStaff] = useState(null)
+  const [picking, setPicking] = useState(false)
+  const [busyId, setBusyId] = useState(null)
+
+  const rider = order.raw?.rider
+  const assigned = Boolean(rider?.userId)
+  const needsManual = Boolean(order.raw?.assignment?.needsManualAssignment)
+
+  useEffect(() => {
+    if (!picking || staff) return
+    let cancelled = false
+    fetchDeliveryStaff()
+      .then((rows) => !cancelled && setStaff(rows))
+      .catch(() => !cancelled && setStaff([]))
+    return () => {
+      cancelled = true
+    }
+  }, [picking, staff])
+
+  const assign = async (member) => {
+    setBusyId(member.id)
+    try {
+      await onAssignRider(order.id, member.id)
+      toast.success(`Assigned to ${member.name}`)
+      setPicking(false)
+    } catch (e) {
+      toast.error(e.message || 'Could not assign this driver.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <div>
+      <div style={css('font-size: 13px; font-weight: 800; color: #7B857F; text-transform: uppercase; letter-spacing: .6px;')}>
+        Driver
+      </div>
+
+      {needsManual && !assigned ? (
+        <div style={css('background: #FFF6E2; border: 1px solid #E8CE8C; border-radius: 12px; padding: 12px 14px; margin-top: 8px; font-size: 13.5px; font-weight: 700; color: #7A5205; line-height: 1.45;')}>
+          No driver was free when this order came in, so it was never assigned. It is not in anyone's
+          delivery app until you assign it.
+        </div>
+      ) : null}
+
+      <div style={css('display: flex; align-items: center; gap: 12px; margin-top: 10px;')}>
+        <div style={css('flex: 1;')}>
+          <div style={css('font-size: 15.5px; font-weight: 800;')}>
+            {assigned ? localized(rider.name) : 'Not assigned'}
+          </div>
+          {assigned && rider.phone ? (
+            <div style={css('font-size: 13px; font-weight: 600; color: #7B857F; margin-top: 2px;')}>{rider.phone}</div>
+          ) : null}
+        </div>
+        <button
+          onClick={() => setPicking((v) => !v)}
+          style={css('background: #FFFFFF; border: 1px solid #E4EADF; border-radius: 11px; padding: 10px 16px; font-size: 13.5px; font-weight: 800; cursor: pointer;')}
+        >
+          {picking ? 'Close' : assigned ? 'Reassign' : 'Assign driver'}
+        </button>
+      </div>
+
+      {picking ? (
+        <div style={css('margin-top: 10px; display: flex; flex-direction: column; gap: 8px;')}>
+          {staff === null ? (
+            <div style={css('font-size: 13.5px; font-weight: 600; color: #7B857F;')}>Loading drivers…</div>
+          ) : staff.length === 0 ? (
+            <div style={css('font-size: 13.5px; font-weight: 600; color: #7B857F;')}>
+              No delivery staff yet. Add one on the Delivery Staff screen.
+            </div>
+          ) : (
+            staff.map((m) => {
+              const isCurrent = assigned && String(rider.userId) === String(m.id)
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => assign(m)}
+                  disabled={busyId !== null || isCurrent}
+                  className="hv-row"
+                  style={css(
+                    `display:flex;align-items:center;gap:12px;text-align:left;background:#FAFBF9;` +
+                      `border:1px solid ${isCurrent ? '#A9DE8F' : '#EFF1ED'};border-radius:12px;padding:11px 14px;` +
+                      `cursor:${busyId !== null || isCurrent ? 'default' : 'pointer'};` +
+                      `opacity:${m.availability === 'off_shift' && !isCurrent ? 0.62 : 1};`,
+                  )}
+                >
+                  <span style={css('flex: 1; font-size: 14.5px; font-weight: 800;')}>
+                    {m.name}
+                    <span style={css('display:block;font-size:12.5px;font-weight:600;color:#7B857F;margin-top:2px;')}>
+                      {AVAIL_LABEL[m.availability] || 'Off shift'}
+                      {m.activeOrderIds?.length ? ` · ${m.activeOrderIds.length} in hand` : ''}
+                    </span>
+                  </span>
+                  <span style={css(`font-size:13px;font-weight:800;color:${isCurrent ? '#2E7A12' : GREEN};`)}>
+                    {busyId === m.id ? 'Assigning…' : isCurrent ? 'Current' : 'Assign'}
+                  </span>
+                </button>
+              )
+            })
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

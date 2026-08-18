@@ -109,7 +109,13 @@ function Shell() {
 
       <div className="fc-scrim" onClick={() => setNavOpen(false)} />
 
-      <OrderDrawer order={selectedOrder} onClose={() => setSelected(null)} onAdvance={live.advance} onCancel={live.cancel} />
+      <OrderDrawer
+        order={selectedOrder}
+        onClose={() => setSelected(null)}
+        onAdvance={live.advance}
+        onCancel={live.cancel}
+        onAssignRider={live.assignRider}
+      />
 
       <InstallPrompt />
     </>

@@ -10,6 +10,7 @@ import { useToast } from '../lib/toast'
 import { Field, inputStyle } from '../components/FormField'
 import { recordCreditPayment } from '../lib/ordersData'
 import StateBlock from '../components/StateBlock'
+import Portal from '../components/Portal'
 
 const GRID = 'display:grid;grid-template-columns:minmax(240px, 2fr) 170px 150px 140px 120px;gap:14px;align-items:center;padding:16px 22px;min-width:940px;border-top:1px solid #F2F4F0;'
 
@@ -120,6 +121,7 @@ function SettleModal({ account, onClose, onSettled }) {
   }
 
   return (
+    <Portal>
     <div className="fc-backdrop" onClick={onClose} style={css('position: fixed; inset: 0; background: rgba(15,26,18,.42); display: flex; align-items: center; justify-content: center; z-index: 30;')}>
       <form onSubmit={handleSubmit(confirmSettle)} onClick={(e) => e.stopPropagation()} className="fc-modal" style={css('background: #FFFFFF; border-radius: 20px; padding: 26px; width: 360px; max-width: 90vw; display: flex; flex-direction: column; gap: 14px;')}>
         <div style={css('font-size: 18px; font-weight: 800;')}>Record payment</div>
@@ -150,5 +152,6 @@ function SettleModal({ account, onClose, onSettled }) {
         </div>
       </form>
     </div>
+    </Portal>
   )
 }
